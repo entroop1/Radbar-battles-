@@ -1,0 +1,635 @@
+<title>Riddle Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* Single blueprint look on purpose: the game lives on a workshop drawing board. */
+  :root {
+    color-scheme: dark;
+    --ground: #163a66;
+    --ground-deep: #0e2748;
+    --line: rgba(234, 242, 255, 0.10);
+    --line-strong: rgba(234, 242, 255, 0.28);
+    --ink: #eaf2ff;
+    --ink-soft: #a9bddb;
+    --hazard: #ffc93c;
+    --hazard-ink: #2a1d00;
+    --rust: #e07a3f;
+    --good: #5be39a;
+    --bad: #ff6b5e;
+    --display: "Bungee", "Impact", "Arial Black", sans-serif;
+    --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    background-color: var(--ground);
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.45;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 20px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+  h1 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(28px, 6vw, 44px);
+    line-height: 1;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  h1 span { color: var(--hazard); }
+  .sub { margin: 0; color: var(--ink-soft); max-width: 46ch; }
+  h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  /* Arena */
+  .arena {
+    position: relative;
+    border: 2px solid var(--line-strong);
+    border-radius: 6px;
+    background: linear-gradient(to bottom, transparent 70%, rgba(14,39,72,0.8) 70%);
+    padding: 14px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .arena::after {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 30%;
+    border-top: 3px dashed var(--hazard);
+    opacity: 0.35;
+  }
+  .fighter { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; z-index: 1; }
+  .foe { align-items: flex-end; text-align: right; }
+  .tag { font-family: var(--display); font-size: clamp(13px, 2.8vw, 17px); line-height: 1.1; }
+  .tag small { display: block; font-family: var(--mono); font-size: 11px; color: var(--ink-soft); letter-spacing: 0.06em; }
+  .hp { width: 100%; max-width: 260px; }
+  .hp-track { height: 12px; border: 2px solid var(--ink); border-radius: 3px; background: var(--ground-deep); overflow: hidden; }
+  .hp-fill { height: 100%; width: 100%; background: var(--good); transition: width .5s ease, background-color .3s; }
+  .foe .hp-track { transform: scaleX(-1); }
+  .hp-num { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-soft); margin-top: 3px; }
+  .bot { width: 100%; max-width: 220px; height: auto; display: block; }
+  .vs { font-family: var(--display); color: var(--hazard); font-size: 22px; align-self: center; }
+  .shield-ring { opacity: 0; transition: opacity .3s; }
+  .shielded .shield-ring { opacity: 1; }
+  .saw { transform-box: fill-box; transform-origin: center; animation: spin 1.2s linear infinite; }
+
+  .lunge-r .bot { animation: lungeR .55s ease; }
+  .lunge-l .bot { animation: lungeL .55s ease; }
+  .hit .bot { animation: shake .45s ease; }
+  .misfire .bot { animation: whirl .9s ease; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes lungeR { 40% { transform: translateX(28%); } }
+  @keyframes lungeL { 40% { transform: translateX(-28%); } }
+  @keyframes shake { 20% { transform: translateX(-6px) rotate(-3deg); filter: brightness(1.8) saturate(0.4); } 60% { transform: translateX(6px) rotate(2deg); } }
+  @keyframes whirl { 50% { transform: rotate(200deg) translateY(-10px); } 100% { transform: rotate(360deg); } }
+
+  .pop {
+    position: absolute; top: 40%; left: 50%;
+    font-family: var(--display); font-size: 26px;
+    pointer-events: none; white-space: nowrap;
+    animation: pop 1.1s ease-out forwards;
+    text-shadow: 2px 2px 0 var(--ground-deep);
+  }
+  @keyframes pop { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, -60px); opacity: 0; } }
+
+  /* Status strip */
+  .status {
+    font-family: var(--mono);
+    font-size: 14px;
+    background: var(--ground-deep);
+    border-left: 4px solid var(--hazard);
+    padding: 10px 12px;
+    min-height: 44px;
+    overflow-wrap: anywhere;
+  }
+  .status .q { color: var(--ink); }
+  .status .ok { color: var(--good); font-weight: 600; }
+  .status .no { color: var(--bad); font-weight: 600; }
+
+  /* Control panel */
+  .panel { display: flex; flex-direction: column; gap: 10px; }
+  .parts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .part {
+    font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+    background: var(--ground-deep);
+    border: 2px solid var(--line-strong);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color .15s, transform .15s;
+  }
+  .part:hover:not(:disabled) { border-color: var(--hazard); transform: translateY(-2px); }
+  .part:focus-visible { outline: 3px solid var(--hazard); outline-offset: 2px; }
+  .part:disabled { opacity: 0.45; cursor: not-allowed; }
+  .part-glyph { font-family: var(--mono); font-size: 18px; color: var(--hazard); letter-spacing: 0.1em; }
+  .part-name { font-weight: 700; font-size: 17px; }
+  .part-does { font-size: 14px; color: var(--ink-soft); }
+  .part-meta { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 12px; margin-top: auto; }
+  .pips { letter-spacing: 2px; color: var(--hazard); }
+  .pips i { font-style: normal; color: var(--line-strong); }
+
+  /* Riddle console */
+  .riddle {
+    background: var(--ink);
+    color: var(--ground-deep);
+    border-radius: 6px;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+    box-shadow: 6px 6px 0 var(--hazard);
+  }
+  .riddle-head { display: flex; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .riddle-q { font-family: var(--body); font-weight: 700; font-size: clamp(19px, 3.6vw, 24px); line-height: 1.3; margin: 0; text-wrap: balance; }
+  .timer { height: 8px; background: rgba(14,39,72,0.15); border-radius: 4px; overflow: hidden; }
+  .timer div { height: 100%; width: 100%; background: var(--ground-deep); }
+  .timer.hurry div { background: var(--bad); }
+  .riddle form { display: flex; gap: 8px; flex-wrap: wrap; }
+  .riddle input {
+    flex: 1 1 200px; min-width: 0;
+    font: 600 18px var(--mono);
+    padding: 10px 12px;
+    border: 2px solid var(--ground-deep);
+    border-radius: 4px;
+    background: #fff; color: var(--ground-deep);
+    color-scheme: light;
+  }
+  .riddle input:focus-visible { outline: 3px solid var(--hazard); outline-offset: 1px; }
+  .btn {
+    font-family: var(--display); font-size: 16px; letter-spacing: 0.04em;
+    background: var(--hazard); color: var(--hazard-ink);
+    border: 2px solid var(--hazard-ink); border-radius: 4px;
+    padding: 10px 18px; cursor: pointer;
+  }
+  .btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .riddle-hint { margin: 0; font-size: 14px; }
+
+  /* Log */
+  .log ol { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 13px; max-height: 190px; overflow-y: auto; }
+  .log li { padding: 4px 0; border-bottom: 1px solid var(--line); color: var(--ink-soft); overflow-wrap: anywhere; }
+  .log li:first-child { color: var(--ink); }
+  .log .you-c { color: var(--good); }
+  .log .foe-c { color: var(--rust); }
+
+  /* End screen */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    background: rgba(14,39,72,0.88);
+    display: grid; place-items: center;
+    padding: 16px;
+  }
+  .end-card {
+    background: var(--ink); color: var(--ground-deep);
+    border-radius: 8px; padding: 24px;
+    max-width: 380px; width: 100%;
+    display: flex; flex-direction: column; gap: 12px; text-align: center;
+    box-shadow: 8px 8px 0 var(--hazard);
+  }
+  .end-card h3 { font-family: var(--display); font-weight: 400; font-size: 30px; margin: 0; line-height: 1.1; }
+  .end-card dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; text-align: left; font-family: var(--mono); font-size: 14px; margin: 0; }
+  .end-card dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .note { font-size: 14px; color: var(--ink-soft); margin: 0; }
+
+  @media (max-width: 640px) {
+    .parts { grid-template-columns: repeat(2, 1fr); }
+    .vs { font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>RIDDLE <span>ARENA</span></h1>
+    <p class="sub">Your bot only moves when you solve its riddles. Bigger weapons, harder riddles. Get one wrong and it misfires.</p>
+  </header>
+
+  <section class="arena" aria-label="Arena">
+    <div class="fighter you" id="you">
+      <div class="tag">BOLT-7<small>YOUR BOT</small></div>
+      <div class="hp"><div class="hp-track"><div class="hp-fill" id="youHp"></div></div><div class="hp-num" id="youHpNum">100 / 100</div></div>
+      <svg class="bot" viewBox="0 0 170 120" aria-hidden="true">
+        <ellipse class="shield-ring" cx="85" cy="68" rx="82" ry="50" fill="rgba(91,227,154,0.12)" stroke="#5be39a" stroke-width="3" stroke-dasharray="8 5"/>
+        <line x1="58" y1="42" x2="50" y2="20" stroke="#eaf2ff" stroke-width="3"/>
+        <circle cx="50" cy="18" r="5" fill="#ff6b5e"/>
+        <rect x="28" y="42" width="96" height="46" rx="8" fill="#cfdcef" stroke="#0e2748" stroke-width="3"/>
+        <rect x="38" y="52" width="40" height="8" fill="#ffc93c"/>
+        <rect x="38" y="66" width="28" height="6" fill="#0e2748" opacity=".35"/>
+        <rect x="94" y="50" width="22" height="14" rx="3" fill="#0e2748"/>
+        <circle cx="108" cy="57" r="4" fill="#5be39a"/>
+        <polygon points="124,78 160,90 124,90" fill="#ffc93c" stroke="#0e2748" stroke-width="2"/>
+        <line x1="120" y1="48" x2="136" y2="40" stroke="#0e2748" stroke-width="5"/>
+        <g class="saw"><circle cx="142" cy="36" r="17" fill="#0e2748" stroke="#eaf2ff" stroke-width="7" stroke-dasharray="4 4"/><circle cx="142" cy="36" r="4" fill="#eaf2ff"/></g>
+        <circle cx="50" cy="94" r="15" fill="#0e2748" stroke="#cfdcef" stroke-width="3"/>
+        <circle cx="104" cy="94" r="15" fill="#0e2748" stroke="#cfdcef" stroke-width="3"/>
+        <circle cx="50" cy="94" r="4" fill="#cfdcef"/><circle cx="104" cy="94" r="4" fill="#cfdcef"/>
+      </svg>
+    </div>
+
+    <div class="vs" aria-hidden="true">VS</div>
+
+    <div class="fighter foe" id="foe">
+      <div class="tag">RUSTY McBASH<small>RIVAL AGENT</small></div>
+      <div class="hp"><div class="hp-track"><div class="hp-fill" id="foeHp"></div></div><div class="hp-num" id="foeHpNum">100 / 100</div></div>
+      <svg class="bot" viewBox="0 0 170 120" aria-hidden="true">
+        <g transform="translate(170,0) scale(-1,1)">
+          <ellipse class="shield-ring" cx="85" cy="68" rx="82" ry="50" fill="rgba(91,227,154,0.12)" stroke="#5be39a" stroke-width="3" stroke-dasharray="8 5"/>
+          <rect x="22" y="36" width="104" height="52" rx="4" fill="#e07a3f" stroke="#2a1405" stroke-width="3"/>
+          <rect x="30" y="44" width="10" height="10" fill="#2a1405" opacity=".35"/>
+          <rect x="44" y="44" width="10" height="10" fill="#2a1405" opacity=".35"/>
+          <rect x="30" y="72" width="60" height="6" fill="#2a1405" opacity=".3"/>
+          <rect x="92" y="46" width="24" height="12" rx="2" fill="#2a1405"/>
+          <circle cx="98" cy="52" r="3.5" fill="#ffc93c"/><circle cx="110" cy="52" r="3.5" fill="#ffc93c"/>
+          <rect x="116" y="30" width="6" height="34" fill="#6b3a1c" transform="rotate(-25 119 47)"/>
+          <rect x="120" y="10" width="30" height="20" rx="3" fill="#8a94a6" stroke="#2a1405" stroke-width="3" transform="rotate(-25 135 20)"/>
+          <polygon points="126,74 158,74 150,90 126,90" fill="#8a94a6" stroke="#2a1405" stroke-width="2"/>
+          <rect x="30" y="86" width="90" height="18" rx="9" fill="#2a1405"/>
+          <circle cx="44" cy="95" r="5" fill="#8a94a6"/><circle cx="75" cy="95" r="5" fill="#8a94a6"/><circle cx="106" cy="95" r="5" fill="#8a94a6"/>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+
+  <section class="panel" id="panel">
+    <h2>Control panel · pick a part, solve its riddle</h2>
+    <div class="parts" id="parts"></div>
+    <p class="note">In the real game an AI agent sits in the driver's seat and solves these. In this mockup, you do.</p>
+  </section>
+
+  <section class="riddle" id="riddle" hidden>
+    <div class="riddle-head"><span id="rPart"></span><span id="rTime"></span></div>
+    <p class="riddle-q" id="rQ"></p>
+    <div class="timer" id="rTimerWrap"><div id="rTimer"></div></div>
+    <form id="rForm" autocomplete="off">
+      <input id="rAnswer" name="answer" aria-label="Your answer" placeholder="Type your answer">
+      <button class="btn" type="submit">FIRE</button>
+    </form>
+    <p class="riddle-hint">No backing out, the timer is running. Answer in the first third of the time for a critical hit.</p>
+  </section>
+
+  <section class="log">
+    <h2>Battle log</h2>
+    <ol id="log"></ol>
+  </section>
+</div>
+
+<div class="overlay" id="end" hidden>
+  <div class="end-card">
+    <h3 id="endTitle"></h3>
+    <p id="endLine" style="margin:0"></p>
+    <dl>
+      <dt>Riddles solved</dt><dd id="stSolved"></dd>
+      <dt>Critical hits</dt><dd id="stCrit"></dd>
+      <dt>Misfires</dt><dd id="stMiss"></dd>
+    </dl>
+    <button class="btn" id="rematch" type="button">REMATCH</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const RIDDLES = {
+    1: [
+      { q: "I have keys but open no locks. What am I?", a: ["keyboard", "piano"], wrong: "a janitor" },
+      { q: "What has hands but can't clap?", a: ["clock", "watch"], wrong: "a robot" },
+      { q: "Unscramble: T O B O R", a: ["robot"], wrong: "tobor" },
+      { q: "2, 4, 6, 8 … what comes next?", a: ["10", "ten"], wrong: "9" },
+      { q: "What gets wetter the more it dries?", a: ["towel"], wrong: "a sponge" },
+      { q: "What has one eye but can't see?", a: ["needle"], wrong: "a cyclops" },
+      { q: "Unscramble: R A E G", a: ["gear"], wrong: "rage" },
+      { q: "What has a neck but no head?", a: ["bottle"], wrong: "a giraffe" },
+      { q: "How many legs do 3 spiders have?", a: ["24", "twentyfour", "twenty four"], wrong: "18" },
+    ],
+    2: [
+      { q: "Legs on 3 spiders, minus the days in a week?", a: ["17", "seventeen"], wrong: "15" },
+      { q: "What can you catch but not throw?", a: ["cold", "a cold"], wrong: "a ball" },
+      { q: "Unscramble: P I L F E R P", a: ["flipper"], wrong: "pilfer" },
+      { q: "1, 1, 2, 3, 5, 8 … what comes next?", a: ["13", "thirteen"], wrong: "11" },
+      { q: "The more you take, the more you leave behind. What are they?", a: ["footsteps", "steps", "footprints"], wrong: "cookies" },
+      { q: "I have cities but no houses, rivers but no water. What am I?", a: ["map"], wrong: "a desert" },
+      { q: "I'm tall when I'm young and short when I'm old. What am I?", a: ["candle"], wrong: "a tree" },
+      { q: "A bot has 12 bolts, loses half, then finds 4 more. How many bolts now?", a: ["10", "ten"], wrong: "8" },
+    ],
+    3: [
+      { q: "What 5-letter word becomes shorter when you add two letters to it?", a: ["short"], wrong: "small" },
+      { q: "2, 3, 5, 7, 11, 13 … what comes next?", a: ["17", "seventeen"], wrong: "15" },
+      { q: "Unscramble: T I C E L Y R I C E T", a: ["electricity"], wrong: "cyclerite" },
+      { q: "I speak without a mouth and hear without ears. I come alive with wind. What am I?", a: ["echo"], wrong: "a ghost" },
+      { q: "What comes once in a minute, twice in a moment, but never in a thousand years?", a: ["m", "the letter m"], wrong: "a second" },
+      { q: "A bat and a ball cost $1.10. The bat costs $1 more than the ball. How many cents is the ball?", a: ["5", "five", "5 cents", "five cents", "005"], wrong: "10 cents" },
+      { q: "Forward I am heavy, backward I am not. What am I?", a: ["ton"], wrong: "a feather" },
+      { q: "Count the wheels on 2 tricycles, then square it.", a: ["36", "thirtysix", "thirty six"], wrong: "12" },
+      { q: "Which word is spelled wrong in every dictionary?", a: ["wrong"], wrong: "misspelled" },
+    ],
+  };
+
+  const YOU_PARTS = [
+    { id: "ram",    glyph: ">>>",  name: "Ram Wheels", does: "Charge in and slam", diff: 1, dmg: 8,  time: 20 },
+    { id: "flip",   glyph: "_/‾",  name: "Flipper",    does: "Launch them in the air", diff: 2, dmg: 15, time: 25 },
+    { id: "saw",    glyph: "✱✱✱", name: "Buzz Saw",   does: "Huge damage, tough riddle", diff: 3, dmg: 25, time: 30 },
+    { id: "shield", glyph: "( )",  name: "Shield",     does: "Block most of the next hit", diff: 1, dmg: 0,  time: 20 },
+  ];
+  const FOE_PARTS = [
+    { id: "ram",    name: "Spiked Ram",  diff: 1, dmg: 8 },
+    { id: "hammer", name: "Sledgehammer", diff: 2, dmg: 15 },
+    { id: "grind",  name: "Grinder",     diff: 3, dmg: 22 },
+    { id: "shield", name: "Scrap Shield", diff: 1, dmg: 0 },
+  ];
+  const FOE_SKILL = { 1: 0.88, 2: 0.68, 3: 0.45 };
+  const MISFIRE = {
+    ram: "BOLT-7 drove straight into the wall.",
+    flip: "The flipper flipped BOLT-7 instead.",
+    saw: "The saw jammed. Lots of sparks, no damage.",
+    shield: "The shield opened backwards.",
+  };
+  const FOE_MISFIRE = {
+    ram: "RUSTY reversed into its own corner.",
+    hammer: "RUSTY bonked itself on the head.",
+    grind: "RUSTY's grinder spat out a sandwich.",
+    shield: "RUSTY's shield fell off.",
+  };
+  const SHIELD_BLOCK = 0.7;
+  const SELF_DMG = 4;
+
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    you: $("you"), foe: $("foe"), youHp: $("youHp"), foeHp: $("foeHp"),
+    youHpNum: $("youHpNum"), foeHpNum: $("foeHpNum"), status: $("status"),
+    parts: $("parts"), panel: $("panel"), riddle: $("riddle"), rPart: $("rPart"), rTime: $("rTime"),
+    rQ: $("rQ"), rTimer: $("rTimer"), rTimerWrap: $("rTimerWrap"), rForm: $("rForm"), rAnswer: $("rAnswer"),
+    log: $("log"), end: $("end"),
+  };
+
+  let S;
+  const used = { 1: new Set(), 2: new Set(), 3: new Set() };
+
+  function fresh() {
+    return {
+      you: { hp: 100, shield: false },
+      foe: { hp: 100, shield: false },
+      busy: false, over: false,
+      stats: { solved: 0, tried: 0, crit: 0, miss: 0 },
+      current: null, timer: null,
+    };
+  }
+
+  function pickRiddle(diff) {
+    const pool = RIDDLES[diff];
+    if (used[diff].size >= pool.length) used[diff].clear();
+    let i;
+    do { i = Math.floor(Math.random() * pool.length); } while (used[diff].has(i));
+    used[diff].add(i);
+    return pool[i];
+  }
+
+  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\b(a|an|the|letter)\b/g, " ").replace(/\s+/g, " ").trim();
+  const isRight = (input, answers) => { const n = norm(input); return n.length > 0 && answers.some((a) => norm(a) === n); };
+
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function renderParts() {
+    el.parts.innerHTML = YOU_PARTS.map((p) => `
+      <button class="part" type="button" data-part="${p.id}">
+        <span class="part-glyph" aria-hidden="true">${p.glyph}</span>
+        <span class="part-name">${p.name}</span>
+        <span class="part-does">${p.does}</span>
+        <span class="part-meta">
+          <span class="pips" aria-label="Riddle difficulty ${p.diff} of 3">${"■".repeat(p.diff)}<i>${"■".repeat(3 - p.diff)}</i></span>
+          <span>${p.dmg ? p.dmg + " dmg" : "defend"}</span>
+        </span>
+      </button>`).join("");
+  }
+
+  function setBusy(b) {
+    S.busy = b;
+    el.parts.querySelectorAll("button").forEach((btn) => (btn.disabled = b || S.over));
+  }
+
+  function renderHp() {
+    for (const who of ["you", "foe"]) {
+      const hp = Math.max(0, S[who].hp);
+      const fill = el[who + "Hp"];
+      fill.style.width = hp + "%";
+      fill.style.backgroundColor = hp > 50 ? "var(--good)" : hp > 25 ? "var(--hazard)" : "var(--bad)";
+      el[who + "HpNum"].textContent = `${hp} / 100`;
+      el[who].classList.toggle("shielded", S[who].shield);
+    }
+  }
+
+  function log(html, cls = "") {
+    const li = document.createElement("li");
+    li.innerHTML = html;
+    if (cls) li.className = cls;
+    el.log.prepend(li);
+  }
+  const status = (html) => (el.status.innerHTML = html);
+
+  function anim(node, cls, ms = 900) {
+    node.classList.remove(cls);
+    void node.offsetWidth;
+    node.classList.add(cls);
+    setTimeout(() => node.classList.remove(cls), ms);
+  }
+  function pop(node, text, color) {
+    const p = document.createElement("div");
+    p.className = "pop";
+    p.textContent = text;
+    p.style.color = color;
+    node.appendChild(p);
+    setTimeout(() => p.remove(), 1150);
+  }
+
+  // Returns damage actually dealt, after the target's shield.
+  function hit(targetKey, dmg) {
+    const t = S[targetKey];
+    let dealt = dmg;
+    if (t.shield) { dealt = Math.round(dmg * (1 - SHIELD_BLOCK)); t.shield = false; }
+    t.hp = Math.max(0, t.hp - dealt);
+    anim(el[targetKey], "hit", 500);
+    pop(el[targetKey], "-" + dealt, "var(--bad)");
+    return dealt;
+  }
+  function misfire(selfKey) {
+    S[selfKey].hp = Math.max(0, S[selfKey].hp - SELF_DMG);
+    anim(el[selfKey], "misfire", 950);
+    pop(el[selfKey], "OOPS -" + SELF_DMG, "var(--hazard)");
+  }
+
+  // ---- Your turn ----
+  function openRiddle(part) {
+    setBusy(true);
+    const r = pickRiddle(part.diff);
+    S.current = { part, r, start: performance.now() };
+    el.panel.hidden = true;
+    el.riddle.hidden = false;
+    el.rPart.textContent = `${part.name} · difficulty ${part.diff}/3`;
+    el.rQ.textContent = r.q;
+    el.rAnswer.value = "";
+    el.rAnswer.focus();
+    status(`Powering up the <b>${part.name}</b>… solve the riddle to fire it.`);
+    tick();
+  }
+
+  function tick() {
+    const c = S.current;
+    if (!c) return;
+    const total = c.part.time * 1000;
+    const left = Math.max(0, total - (performance.now() - c.start));
+    el.rTimer.style.width = (left / total) * 100 + "%";
+    el.rTimerWrap.classList.toggle("hurry", left < total * 0.25);
+    el.rTime.textContent = Math.ceil(left / 1000) + "s";
+    if (left <= 0) return resolveYou("", true);
+    S.timer = requestAnimationFrame(tick);
+  }
+
+  async function resolveYou(answer, timedOut = false) {
+    const c = S.current;
+    if (!c) return;
+    cancelAnimationFrame(S.timer);
+    S.current = null;
+    el.riddle.hidden = true;
+    el.panel.hidden = false;
+    S.stats.tried++;
+
+    const elapsed = (performance.now() - c.start) / 1000;
+    const ok = !timedOut && isRight(answer, c.r.a);
+    const p = c.part;
+
+    if (ok) {
+      S.stats.solved++;
+      const crit = elapsed <= p.time / 3;
+      if (p.id === "shield") {
+        S.you.shield = true;
+        status(`<span class="ok">Solved in ${elapsed.toFixed(1)}s.</span> Shield up. RUSTY's next hit gets mostly blocked.`);
+        log(`BOLT-7 raised its shield (${elapsed.toFixed(1)}s)`, "you-c");
+      } else {
+        const dmg = crit ? Math.round(p.dmg * 1.5) : p.dmg;
+        if (crit) S.stats.crit++;
+        anim(el.you, "lunge-r", 600);
+        await sleep(220);
+        const dealt = hit("foe", dmg);
+        status(`<span class="ok">${crit ? "CRITICAL! " : ""}Solved in ${elapsed.toFixed(1)}s.</span> ${p.name} hits RUSTY for ${dealt}.`);
+        log(`BOLT-7 ${p.name} → ${dealt} dmg${crit ? " (crit)" : ""}`, "you-c");
+      }
+    } else {
+      S.stats.miss++;
+      misfire("you");
+      const why = timedOut ? "Time ran out." : `“${esc(answer || "…")}” is wrong.`;
+      status(`<span class="no">${why}</span> ${MISFIRE[p.id]} The answer was <b>${esc(c.r.a[0])}</b>.`);
+      log(`BOLT-7 misfired its ${p.name} (answer: ${esc(c.r.a[0])})`, "you-c");
+    }
+    renderHp();
+    if (checkEnd()) return;
+    await sleep(1600);
+    foeTurn();
+  }
+
+  // ---- Rival agent's turn ----
+  function foeChoosePart() {
+    if (S.foe.hp < 35 && !S.foe.shield && Math.random() < 0.4) return FOE_PARTS[3];
+    const roll = Math.random();
+    return roll < 0.35 ? FOE_PARTS[0] : roll < 0.7 ? FOE_PARTS[1] : FOE_PARTS[2];
+  }
+
+  async function foeTurn() {
+    const p = foeChoosePart();
+    const r = pickRiddle(p.diff);
+    status(`RUSTY is powering its <b>${p.name}</b> and thinking…<br><span class="q">“${esc(r.q)}”</span>`);
+    await sleep(2200);
+    const ok = Math.random() < FOE_SKILL[p.diff];
+    const secs = (2 + Math.random() * (ok ? 8 : 14)).toFixed(1);
+    if (ok) {
+      const crit = Math.random() < 0.2;
+      if (p.id === "shield") {
+        S.foe.shield = true;
+        status(`RUSTY answered <span class="ok">“${esc(r.a[0])}” ✓</span> in ${secs}s and raised its Scrap Shield.`);
+        log(`RUSTY raised its shield`, "foe-c");
+      } else {
+        const dmg = crit ? Math.round(p.dmg * 1.5) : p.dmg;
+        anim(el.foe, "lunge-l", 600);
+        await sleep(220);
+        const dealt = hit("you", dmg);
+        status(`RUSTY answered <span class="ok">“${esc(r.a[0])}” ✓</span> in ${secs}s. ${crit ? "CRITICAL! " : ""}${p.name} hits you for ${dealt}.`);
+        log(`RUSTY ${p.name} → ${dealt} dmg${crit ? " (crit)" : ""}`, "foe-c");
+      }
+    } else {
+      misfire("foe");
+      status(`RUSTY answered <span class="no">“${esc(r.wrong)}” ✗</span>. ${FOE_MISFIRE[p.id]} Your turn.`);
+      log(`RUSTY misfired its ${p.name} (guessed “${esc(r.wrong)}”)`, "foe-c");
+    }
+    renderHp();
+    if (checkEnd()) return;
+    await sleep(900);
+    setBusy(false);
+    if (ok) status(el.status.innerHTML + " Your turn.");
+  }
+
+  function checkEnd() {
+    if (S.you.hp > 0 && S.foe.hp > 0) return false;
+    S.over = true;
+    setBusy(true);
+    const won = S.foe.hp <= 0;
+    $("endTitle").textContent = won ? "BOLT-7 WINS" : "RUSTY WINS";
+    $("endLine").textContent = won
+      ? "RUSTY McBASH is a pile of scrap. Big brain, big saw."
+      : "BOLT-7 got flattened. Try parts with riddles you're good at.";
+    $("stSolved").textContent = `${S.stats.solved} / ${S.stats.tried}`;
+    $("stCrit").textContent = S.stats.crit;
+    $("stMiss").textContent = S.stats.miss;
+    setTimeout(() => { el.end.hidden = false; $("rematch").focus(); }, 900);
+    return true;
+  }
+
+  function start() {
+    if (S && S.timer) cancelAnimationFrame(S.timer);
+    S = fresh();
+    el.end.hidden = true;
+    el.riddle.hidden = true;
+    el.panel.hidden = false;
+    el.log.innerHTML = "";
+    renderHp();
+    setBusy(false);
+    status("Your turn. Pick a part on the control panel to power it up.");
+    log("The match begins. BOLT-7 vs RUSTY McBASH.");
+  }
+
+  el.parts.addEventListener("click", (e) => {
+    const btn = e.target.closest(".part");
+    if (!btn || S.busy || S.over) return;
+    openRiddle(YOU_PARTS.find((p) => p.id === btn.dataset.part));
+  });
+  el.rForm.addEventListener("submit", (e) => { e.preventDefault(); resolveYou(el.rAnswer.value); });
+  $("rematch").addEventListener("click", start);
+
+  renderParts();
+  start();
+})();
+</script>
