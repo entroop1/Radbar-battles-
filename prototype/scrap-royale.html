@@ -287,7 +287,7 @@
       <ol class="standings" id="standings"></ol>
       <div class="season-wrap" id="seasonWrap" hidden><table class="season"><thead><tr><th>#</th><th>Agent</th><th>PTS</th><th>WINS</th><th>CPS</th><th>WRECKS</th><th>RDS</th></tr></thead><tbody id="seasonBody"></tbody></table></div>
       <p class="agent-note" id="agentNote">Outside agents: checking the mailbox…</p>
-      <p class="note">Bots marked AGENT are driven by an outside AI sending orders through the mailbox; the game pauses at each turn to wait for them. The rest are scripted, with an autopilot driving in between decisions.</p>
+      <p class="note">Bots marked AGENT run a brain written by an outside AI: its own if-then rules and build plan, applied live on instinct. The AI rewrites them between rounds from its round report. The rest are scripted, with an autopilot driving in between decisions.</p>
     </section>
   </div>
 </div>
@@ -921,6 +921,7 @@
       lastHitBy: null, lastHitAt: -9, deathT: 0, killedBy: null, killedWith: null, history: [], moved: 0, v: 0, lastV: 0, tiltP: 0, tiltR: 0, bump: 0, dustT: 0, hop: null,
     };
     b.st = stats(spec); b.maxHp = b.st.maxHp; b.hp = b.maxHp; b.r = 1.3 * sizeScale(spec.size);
+    if (b.external) attachBrain(b);
     b.label = makeLabel();
     mountMesh(b);
     b.history.push({ gen: 1, reason: "Starting kit: a box on wheels.", img: thumb(spec, b.color) });
@@ -1087,6 +1088,7 @@
   }
 
   function think(b) {
+    if (b.brain && S.phase === "fight") return brainThink(b);
     b.lastThink = S.t;
     b.thinkT = rand(1.8, 3.2);
     const enemies = S.bots.filter((o) => o.alive && o !== b).map((o) => ({ o, d: dist(b, o) })).sort((a, z) => a.d - z.d);
@@ -1202,6 +1204,7 @@
     b.dmgSinceBuild = 0; b.escapes = 0; b.flipped = 0;
     mountMesh(b);
     b.history.push({ gen: b.gen, reason: up.reason, img: thumb(b.spec, b.color) });
+    if (b.brain) b.buildLog.push({ at: Math.round(S.fightT), build: describe(b.spec) });
     b.bump = 1; b.heat = (b.heat || 0) + 3;
     spark(b.x, 1.5, b.z, 40, [0xffffff, 0x7fe8ff, 0xffd166], 6); puff(b.x, 0.3, b.z, 6, 0xfde2c4, 1.2, 1.4);
     feed(b, `evolved to <b>v${b.gen}</b>: ${esc(describe(b.spec))}`, "evo");
@@ -1230,6 +1233,7 @@
   function kill(b, by) {
     b.alive = false; b.hp = 0; b.deathT = S.fightT; b.killedBy = by; b.killedWith = by ? by.spec.weapon : null;
     b.deaths++;
+    if (b.brain) b.deathLog.push({ at: Math.round(S.fightT), by: by ? by.name : "zone", weapon: by ? by.spec.weapon : null, build: describe(b.spec) });
     if (S.mode === "rush") b.respawnT = 4; else S.placements.unshift(b);
     const drop = 3 + b.gen * 2 + Math.floor(b.scrap / 2);
     const n = Math.min(8, Math.ceil(drop / 2));
@@ -1381,6 +1385,7 @@
         }
       }
       b.moved += moved; b.v = moved / dt;
+      if (b.brain && fighting) { const k = b.building > 0 ? "build" : b.goal.type; b.goalTime[k] = (b.goalTime[k] || 0) + dt; }
       // dust trail
       b.dustT -= dt;
       if (b.v > 3 && b.dustT <= 0 && !b.R.hover) { b.dustT = 0.09; puff(b.x - Math.cos(b.h) * 1.1, 0.1, b.z + Math.sin(b.h) * 1.1, 1, 0xfde2c4, 0.55, 0.4); }
@@ -1434,11 +1439,11 @@
           planZone(); setZoneVisible(true); drawZone();
           feed(null, `GO! ${S.bots.length} bots, one winner.`, "zone");
         }
-        S.bots.forEach((b) => { b.thinkT = rand(0, 0.8); b.goal = { type: "idle" }; });
+        S.bots.forEach((b) => { b.thinkT = rand(0, 0.8); b.goal = { type: "idle" }; if (b.external) attachBrain(b); });
       }
     } else if (S.phase === "fight") {
       S.fightT += dt;
-      if (S.bots.some((b) => b.external)) { S.turnT = (S.turnT == null ? turnLength() : S.turnT) - dt; if (S.turnT <= 0 && !S.waiting) beginWait(); }
+      if (turnLength() > 0 && S.bots.some((b) => b.external)) { S.turnT = (S.turnT == null ? turnLength() : S.turnT) - dt; if (S.turnT <= 0 && !S.waiting) beginWait(); }
       if (S.mode === "rush") {
         updateCheckpoints(dt);
         S.rules = S.rules.filter((r) => r.until > S.fightT);
@@ -1552,6 +1557,7 @@
     Object.assign(b, { x, z, y: 18, vy: 0, landed: false, alive: true, gen: 1, scrap: 0, respawnT: 0, cd: 1, stun: 0, air: 0, building: 0, pendingUpgrade: null, dmgSinceBuild: 0, escapes: 0, flipped: 0, goal: { type: "idle" }, thinkT: 0.6, killedBy: null });
     b.spec = { chassis: "box", size: 1, loco: "wheels4", weapon: "none", wlvl: 1, armor: 0, scanner: 0 };
     b.st = stats(b.spec); b.maxHp = b.st.maxHp; b.hp = b.maxHp; b.r = 1.3 * sizeScale(b.spec.size);
+    if (b.brain) b.planIdx = 0;
     b.label.sp.visible = true;
     mountMesh(b);
     b.history.push({ gen: 1, reason: `Wrecked, respawned as a plain box. Still holding ${b.cps} checkpoint${b.cps === 1 ? "" : "s"}.`, img: thumb(b.spec, b.color) });
@@ -1607,6 +1613,7 @@
   }
   function captureCp(cp, b) {
     b.cps++;
+    if (b.brain) b.capLog.push(Math.round(S.fightT));
     S.cps.splice(S.cps.indexOf(cp), 1);
     dyn.remove(cp.g);
     S.cpSpawnT = 3;
@@ -2037,8 +2044,8 @@
      orders/<NAME>  {seq, goal:{type,...}, thought, hold, rulePrefs, ask}                 -> steers the bot live
      reports/<NAME> written by this page at each turn pause, on ask, and at round end. */
   let mbox = null;
-  const extSeats = {}, lastSeq = {};
-  const turnLength = () => clamp(Math.min(...Object.values(extSeats).map((x) => Number(x.turnSeconds) || 10)), 4, 30);
+  const extSeats = {}, lastSeq = {}, extBrains = {};
+  const turnLength = () => { const t = Object.values(extSeats).map((x) => Number(x.turnSeconds) || 0).filter((x) => x > 0); return t.length ? clamp(Math.min(...t), 4, 30) : 0; };
   function goalValid(g) {
     if (!g) return false;
     if (g.type === "hunt") return g.target && g.target.alive;
@@ -2098,6 +2105,147 @@
     if (err) feed(b, `order failed: ${esc(err)}`, "agent");
   }
 
+  /* ---------- Agent-written brains ----------
+     brains/<NAME> = {tick, rules:[{if, do, target?}], buildPlan:[...], rulePrefs:[...], note}
+     Conditions use a tiny safe language (no code runs): numbers, variables below,
+     < <= > >= == !=, and, or, not, parentheses, and the word always. */
+  const BRAIN_VARS = ["hp", "scrap", "cost", "canBuild", "cps", "deaths", "gen", "hasWeapon", "scanner", "timeLeft", "leaderCps", "behind", "enemy.dist", "enemy.hp", "enemy.power", "enemies.near", "cp.found", "cp.dist", "cp.rivals", "cp.progress", "cp.hidden", "crate.dist", "item.dist", "hurt", "rule.glass", "rule.jam", "rule.turbo", "rule.lowgrav", "rule.double", "rule.freeze"];
+  const BRAIN_ACTIONS = ["capture", "build", "scavenge", "crate", "hunt", "flee", "explore", "hold"];
+  function compileCond(src) {
+    const toks = String(src).toLowerCase().match(/\s*(<=|>=|==|!=|<|>|\(|\)|[a-z_][a-z_.]*|\d+(?:\.\d+)?)/g);
+    if (!toks || toks.join("").replace(/\s/g, "") !== String(src).toLowerCase().replace(/\s/g, "")) throw new Error(`can't read "${src}"`);
+    const t = toks.map((x) => x.trim()); let i = 0;
+    const peek = () => t[i], next = () => t[i++];
+    const known = new Map(BRAIN_VARS.map((v) => [v.toLowerCase(), v]));
+    function atom() {
+      const x = next();
+      if (x === undefined) throw new Error("condition ends too early");
+      if (x === "(") { const e = or(); if (next() !== ")") throw new Error("missing )"); return e; }
+      if (x === "not") { const e = atom(); return (c) => !e(c); }
+      if (x === "always" || x === "true") return () => true;
+      if (/^\d/.test(x)) { const v = +x; return () => v; }
+      if (known.has(x)) { const k = known.get(x); return (c) => c[k]; }
+      throw new Error(`unknown word "${x}"`);
+    }
+    function cmp() {
+      const a = atom(), op = peek();
+      if (["<", "<=", ">", ">=", "==", "!="].includes(op)) { next(); const b = atom(); return (c) => { const x = a(c), y = b(c); return op === "<" ? x < y : op === "<=" ? x <= y : op === ">" ? x > y : op === ">=" ? x >= y : op === "==" ? x == y : x != y; }; }
+      return (c) => !!a(c);
+    }
+    function and() { let e = cmp(); while (peek() === "and") { next(); const l = e, r = cmp(); e = (c) => l(c) && r(c); } return e; }
+    function or() { let e = and(); while (peek() === "or") { next(); const l = e, r = and(); e = (c) => l(c) || r(c); } return e; }
+    const f = or();
+    if (i < t.length) throw new Error(`unexpected "${t[i]}"`);
+    return f;
+  }
+  function compileBrain(d) {
+    const errors = [], rules = [];
+    (Array.isArray(d.rules) ? d.rules : []).slice(0, 24).forEach((r, i) => {
+      const act = String(r && r.do || "").toLowerCase();
+      if (!BRAIN_ACTIONS.includes(act)) { errors.push(`rule ${i + 1}: unknown action "${r && r.do}"`); return; }
+      try { rules.push({ n: i + 1, src: String(r.if || "always"), test: compileCond(r.if || "always"), act, target: String(r.target || "nearest").toLowerCase(), range: clamp(Number(r.range) || 45, 5, 300) }); }
+      catch (e) { errors.push(`rule ${i + 1}: ${e.message}`); }
+    });
+    if (!rules.length) errors.push("no usable rules, so the scripted brain stays in charge");
+    const plan = (Array.isArray(d.buildPlan) ? d.buildPlan : []).slice(0, 20).map(String);
+    return { rules, plan, tick: clamp(Number(d.tick) || 0.6, 0.3, 3), rulePrefs: Array.isArray(d.rulePrefs) ? d.rulePrefs.map(String) : null, note: String(d.note || "").slice(0, 200), errors, version: d.version || null };
+  }
+  function brainContext(b, enemies) {
+    const near = enemies[0];
+    const found = S.cps.filter((c) => c.revealed).map((c) => ({ c, d: Math.hypot(c.x - b.x, c.z - b.z) })).sort((p, q) => p.d - q.d);
+    const cp = found[0];
+    const items = S.items.filter((it) => it.kind !== "crate" || it.landed);
+    const nearestItem = items.reduce((m, it) => Math.min(m, Math.hypot(it.x - b.x, it.z - b.z)), 999);
+    const crate = items.filter((it) => it.kind === "crate").reduce((m, it) => Math.min(m, Math.hypot(it.x - b.x, it.z - b.z)), 999);
+    const lead = S.bots.reduce((m, o) => Math.max(m, o.cps), 0);
+    return {
+      hp: pct(b), scrap: b.scrap, cost: cost(b), canBuild: b.scrap >= cost(b) && !ruleOn("freeze") && b.building <= 0 ? 1 : 0, cps: b.cps, deaths: b.deaths, gen: b.gen,
+      hasWeapon: b.spec.weapon !== "none" ? 1 : 0, scanner: b.spec.scanner || 0, timeLeft: S.mode === "rush" ? Math.max(0, RUSH_TIME - S.fightT) : 999, leaderCps: lead, behind: lead - b.cps,
+      "enemy.dist": near ? near.d : 999, "enemy.hp": near ? pct(near.o) : 100, "enemy.power": near ? power(near.o) / Math.max(1, power(b)) : 0, "enemies.near": enemies.filter((e) => e.d < 25).length,
+      "cp.found": cp ? 1 : 0, "cp.dist": cp ? cp.d : 999, "cp.rivals": cp ? enemies.filter((e) => Math.hypot(e.o.x - cp.c.x, e.o.z - cp.c.z) < 12).length : 0, "cp.progress": cp ? cp.c.capT / CP_HOLD : 0, "cp.hidden": S.cps.filter((c) => !c.revealed).length,
+      "crate.dist": crate, "item.dist": nearestItem, hurt: S.t - b.lastHitAt < 3 ? 1 : 0,
+      "rule.glass": ruleOn("glass") ? 1 : 0, "rule.jam": ruleOn("jam") ? 1 : 0, "rule.turbo": ruleOn("turbo") ? 1 : 0, "rule.lowgrav": ruleOn("lowgrav") ? 1 : 0, "rule.double": ruleOn("double") ? 1 : 0, "rule.freeze": ruleOn("freeze") ? 1 : 0,
+      _cp: cp, _enemies: enemies,
+    };
+  }
+  function brainAction(b, r, ctx) {
+    const E = ctx._enemies.filter((e) => e.d <= r.range);
+    switch (r.act) {
+      case "capture": {
+        if (!ctx._cp || ctx._cp.d > r.range * 4) return null;
+        const cp = ctx._cp.c, onIt = ctx._cp.d < CP_RADIUS + 3;
+        const rivals = ctx._enemies.filter((e) => Math.hypot(e.o.x - cp.x, e.o.z - cp.z) < CP_RADIUS + 3);
+        if (onIt && rivals.length) return { goal: { type: "hunt", target: rivals[0].o, cp }, why: `pushing ${rivals[0].o.name} off checkpoint #${cp.id}` };
+        return { goal: { type: "cp", cp }, why: `checkpoint #${cp.id}, ${Math.round(ctx._cp.d)} m` };
+      }
+      case "build": {
+        if (!ctx.canBuild) return null;
+        let up = null;
+        while (b.planIdx < b.brain.plan.length && !up) { up = upgradeFromOrder(b, b.brain.plan[b.planIdx], `Build plan step ${b.planIdx + 1}: ${b.brain.plan[b.planIdx]}.`); b.planIdx++; }
+        if (!up) up = chooseUpgrade(b);
+        b.pendingUpgrade = up; b.building = 1.6;
+        return { goal: { type: "build" }, why: up.reason };
+      }
+      case "scavenge": case "crate": {
+        const list = S.items.filter((it) => (it.kind !== "crate" || it.landed) && (r.act === "scavenge" || it.kind === "crate")).map((it) => ({ it, d: Math.hypot(it.x - b.x, it.z - b.z) })).filter((x) => x.d <= r.range * 2).sort((p, q) => p.d / (p.it.value) - q.d / (q.it.value));
+        if (!list.length) return null;
+        return { goal: { type: "item", item: list[0].it }, why: `${list[0].it.kind} ${Math.round(list[0].d)} m away` };
+      }
+      case "hunt": {
+        if (!E.length) return null;
+        let t = E[0].o;
+        if (r.target === "weakest") t = E.slice().sort((p, q) => pct(p.o) - pct(q.o))[0].o;
+        else if (r.target === "leader") t = E.slice().sort((p, q) => q.o.cps - p.o.cps)[0].o;
+        else if (r.target === "biggest") t = E.slice().sort((p, q) => q.o.maxHp - p.o.maxHp)[0].o;
+        else if (r.target === "attacker") { if (!(b.lastHitBy && b.lastHitBy.alive && S.t - b.lastHitAt < 8)) return null; t = b.lastHitBy; }
+        return { goal: { type: "hunt", target: t }, why: `hunting ${t.name} (${r.target})` };
+      }
+      case "flee": {
+        if (!E.length) return null;
+        return { goal: { type: "flee", from: E[0].o }, why: `backing away from ${E[0].o.name}` };
+      }
+      case "explore": {
+        let px = b.x, pz = b.z, best = -1e9;
+        for (let k = 0; k < 10; k++) {
+          const a = rand(0, Math.PI * 2), d = Math.sqrt(Math.random()) * (WORLD - 10), qx = Math.cos(a) * d, qz = Math.sin(a) * d;
+          const sc = Math.min(80, ...S.bots.filter((o) => o !== b && o.alive).map((o) => Math.hypot(o.x - qx, o.z - qz))) - Math.hypot(qx - b.x, qz - b.z) * 0.35;
+          if (sc > best) { best = sc; px = qx; pz = qz; }
+        }
+        return { goal: { type: "point", x: px, z: pz }, why: `exploring ${compass(px - b.x, pz - b.z)}` };
+      }
+      case "hold": return { goal: { type: "idle" }, why: "holding position" };
+    }
+    return null;
+  }
+  function brainThink(b) {
+    b.lastThink = S.t;
+    b.thinkT = b.brain.tick;
+    // keep committing to a goal that's still valid unless a higher rule now fires
+    const enemies = S.bots.filter((o) => o.alive && o !== b && !o.hop).map((o) => ({ o, d: dist(b, o) })).sort((p, q) => p.d - q.d);
+    const ctx = brainContext(b, enemies);
+    const prev = b.goal;
+    for (const r of b.brain.rules) {
+      let ok = false;
+      try { ok = !!r.test(ctx); } catch (e) { ok = false; }
+      if (!ok) continue;
+      // same action as before and still valid: keep it (no jitter)
+      if (b.lastRule === r.n && goalValid(prev) && prev.type !== "idle" && r.act !== "build" && !(r.act === "explore" && prev.type === "point" && Math.hypot(prev.x - b.x, prev.z - b.z) < 4)) { b.ruleHits[r.n] = (b.ruleHits[r.n] || 0) + 1; return; }
+      const a = brainAction(b, r, ctx);
+      if (!a) continue;
+      b.goal = a.goal; b.lastRule = r.n; b.ruleHits[r.n] = (b.ruleHits[r.n] || 0) + 1;
+      b.thought = `Rule ${r.n} (${r.src} → ${r.act}): ${a.why}.`; b.thoughtAt = S.t; S.lastThinker = b;
+      if (!prev || prev.type !== a.goal.type) feed(b, esc(b.thought), "agent");
+      return;
+    }
+    b.goal = { type: "idle" }; b.lastRule = 0;
+  }
+  function attachBrain(b) {
+    const br = extBrains[b.name];
+    b.brain = br && br.rules.length ? br : null;
+    b.planIdx = 0; b.ruleHits = {}; b.goalTime = {}; b.deathLog = []; b.capLog = []; b.buildLog = [];
+    if (b.brain && b.brain.rulePrefs) b.rulePrefs = b.brain.rulePrefs;
+  }
+
   function botBrief(o, me) {
     return { name: o.name, x: Math.round(o.x), z: Math.round(o.z), dist: me ? Math.round(dist(o, me)) : undefined, hpPct: Math.round((o.hp / o.maxHp) * 100), weapon: o.spec.weapon, version: o.gen, build: describe(o.spec), checkpoints: o.cps, doing: o.goal.type, alive: o.alive };
   }
@@ -2116,7 +2264,10 @@
     rep.activeRules = S.rules.map((r) => ({ id: r.id, name: r.name, secondsLeft: Math.max(0, Math.ceil(r.until - S.fightT)) }));
     rep.leaderboard = S.bots.slice().sort((p, q) => q.cps - p.cps || q.kills - p.kills).slice(0, 6).map((o) => ({ name: o.name, checkpoints: o.cps, wrecks: o.kills }));
     rep.recentEvents = (S.log || []).slice(-14);
+    if (b && b.brain) rep.brain = { version: b.brain.version, errors: b.brain.errors, loadedRules: b.brain.rules.map((r) => `${r.n}: if ${r.src} → ${r.act}${r.act === "hunt" ? " " + r.target : ""}`), ruleHits: b.ruleHits, secondsByActivity: Object.fromEntries(Object.entries(b.goalTime || {}).map(([k, v]) => [k, Math.round(v)])), buildPlanDone: b.planIdx, builds: b.buildLog, deaths: b.deathLog, capturesAt: b.capLog };
+    if (b && !b.brain && extBrains[name]) rep.brainErrors = extBrains[name].errors;
     if (reason === "round-over" && S.finalOrder) rep.finalStandings = S.finalOrder.slice(0, 15).map((o, i) => ({ place: i + 1, name: o.name, checkpoints: o.cps, wrecks: o.kills, deaths: o.deaths }));
+    rep.brainFormat = 'Write brains/' + name + ' = {"version": 2, "tick": 0.6, "rules": [{"if": "hp < 30 and enemy.dist < 20", "do": "flee"}, {"if": "canBuild", "do": "build"}, {"if": "cp.found and cp.rivals == 0", "do": "capture"}, {"if": "enemy.dist < 15 and enemy.hp < 40", "do": "hunt", "target": "weakest|nearest|leader|biggest|attacker", "range": 45}, {"if": "always", "do": "explore"}], "buildPlan": ["weapon:flipper", "scanner", "armor", "loco:wheels6", "weapon-level"], "rulePrefs": ["reveal", "turbo"]}. Actions: ' + BRAIN_ACTIONS.join(", ") + '. Variables: ' + BRAIN_VARS.join(", ") + '.';
     rep.orderFormat = 'Write orders/' + name + ' = {"seq": <bigger than lastOrderSeq>, "goal": {"type": "checkpoint", "id": 3} | {"type": "hunt", "target": "NAME"} | {"type": "move", "x": 0, "z": 0} | {"type": "scavenge"} | {"type": "flee", "from": "NAME"} | {"type": "build", "upgrade": "armor" | "weapon:saw|ram|hammer|spinner|flipper|cannon" | "weapon-level" | "loco:wheels6|hover|treads" | "chassis:wedge|dome|tank" | "size" | "scanner"} | {"type": "auto"}, "thought": "why (shown in your thought bubble)", "hold": 12, "rulePrefs": ["glass", "reveal", ...]}';
     try { await mbox.doc("reports/" + name).set(JSON.parse(JSON.stringify(rep))); } catch (e) { agentNote(`Couldn't write ${name}'s report (${e.code || "error"}).`); }
   }
@@ -2155,6 +2306,19 @@
       }
       refreshAgentNote();
     }, (e) => agentNote(`Mailbox disconnected (${e.code}). Reload to reconnect.`));
+    mbox.collection("brains").onSnapshot((snap) => {
+      for (const doc of snap.docs) {
+        const d = doc.data(); if (!d) continue;
+        const name = String(doc.id).toUpperCase().slice(0, 12);
+        const key = JSON.stringify(d);
+        if (extBrains[name] && extBrains[name].key === key) continue;
+        const br = compileBrain(d); br.key = key;
+        extBrains[name] = br;
+        const b = S && S.bots.find((x) => x.name === name);
+        if (b) { attachBrain(b); feed(b, `loaded a new brain${br.version ? " (v" + esc(br.version) + ")" : ""}: ${br.rules.length} rules, ${br.plan.length}-step build plan${br.errors.length ? ". Problems: " + esc(br.errors.join("; ")) : ""}.`, "agent"); }
+        setTimeout(() => writeReport(name, "brain-loaded"), 30);
+      }
+    });
     let first = true;
     mbox.collection("orders").onSnapshot((snap) => {
       for (const doc of snap.docs) {
