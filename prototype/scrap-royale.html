@@ -151,6 +151,8 @@
   .tag.join-t { background: var(--good); color: #fff; }
   .tag.cp-t { background: var(--gold); color: #3a2600; }
   .tag.rule-t { background: #4b2a94; color: #fff; }
+  .tag.agent-t { background: #2b1d16; color: #fff; }
+  .agent-note { font-size: 13px; font-weight: 700; padding: 8px 10px; border-radius: 10px; background: #efe6ff; color: #3d1f80; margin: 0; }
 
   .tabs { display: flex; gap: 6px; }
   .tab { font: 700 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; border: 0; background: var(--panel-2); color: var(--ink-soft); border-radius: 999px; padding: 5px 10px; cursor: pointer; }
@@ -284,7 +286,8 @@
       </div>
       <ol class="standings" id="standings"></ol>
       <div class="season-wrap" id="seasonWrap" hidden><table class="season"><thead><tr><th>#</th><th>Agent</th><th>PTS</th><th>WINS</th><th>CPS</th><th>WRECKS</th><th>RDS</th></tr></thead><tbody id="seasonBody"></tbody></table></div>
-      <p class="note">Simulated agents. In the real game each bot's decisions would come from a real AI agent every few seconds, with a simple autopilot driving in between.</p>
+      <p class="agent-note" id="agentNote">Outside agents: checking the mailbox…</p>
+      <p class="note">Bots marked AGENT are driven by an outside AI sending orders through the mailbox; the game pauses at each turn to wait for them. The rest are scripted, with an autopilot driving in between decisions.</p>
     </section>
   </div>
 </div>
@@ -308,6 +311,7 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const lin = (hex) => new THREE.Color(hex).convertSRGBToLinear();
   const hexStr = (n) => "#" + n.toString(16).padStart(6, "0");
+  const r1 = (v) => Math.round(v * 10) / 10;
 
   /* ================= RENDERER / SCENE ================= */
   const GROUND = 0xf3a462;
@@ -811,6 +815,7 @@
     g.clearRect(0, 0, 256, 64);
     g.fillStyle = "rgba(0,0,0,0.12)"; roundRect(g, 8, 8, 240, 52, 24); g.fill();
     g.fillStyle = "#ffffff"; roundRect(g, 8, 4, 240, 52, 24); g.fill();
+    if (b.external) { g.strokeStyle = "#7b3fe4"; g.lineWidth = 5; roundRect(g, 10, 6, 236, 48, 22); g.stroke(); }
     g.fillStyle = hexStr(b.color); g.beginPath(); g.arc(32, 22, 9, 0, 7); g.fill();
     g.font = "800 22px 'Nunito', 'Segoe UI', sans-serif"; g.fillStyle = "#2b1d16"; g.textBaseline = "middle";
     g.fillText(b.name, 48, 23);
@@ -881,7 +886,8 @@
     resetProps();
     round++;
     selected = null;
-    const roster = AGENTS.slice().sort(() => Math.random() - 0.5).slice(0, LOBBY_SIZE);
+    const ext = AGENTS.filter((a) => a.external && extSeats[a.name]);
+    const roster = [...ext, ...AGENTS.filter((a) => !a.external).sort(() => Math.random() - 0.5)].slice(0, LOBBY_SIZE).sort(() => Math.random() - 0.5);
     S = {
       phase: "lobby", t: 0, fightT: 0, bots: [], items: [], shots: [], queue: roster, joinT: 0.4, countT: 0, resT: 0,
       crateT: 8, scrapT: 6, lastThinker: null, winner: null, placements: [], mode: gameMode, cps: [], rules: [], pick: null, pickQueue: [], cpSpawnT: 0,
@@ -905,7 +911,7 @@
       if (!obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 2) && !(S.bots.some((b) => Math.hypot(b.x - x, b.z - z) < 3))) break;
     }
     const b = {
-      id: S.bots.length, agent, name: agent.name, color: agent.color, instr: agent.instr,
+      id: S.bots.length, agent, name: agent.name, color: agent.color, instr: agent.instr, external: !!agent.external, orderUntil: 0, rulePrefs: agent.rulePrefs || null,
       aggr: agent.aggr, caution: agent.caution, greed: agent.greed, build: agent.build, mode: agent.mode, favor: agent.favor, crates: agent.crates,
       pref: agent.pref === "copy" ? (lastWinnerWeapon || "saw") : agent.pref,
       spec, gen: 1, x, z, h: rand(-Math.PI, Math.PI), y: 16, vy: 0, landed: false,
@@ -1304,7 +1310,7 @@
           b.building -= dt;
           if (Math.random() < dt * 14) spark(b.x + rand(-1, 1), rand(0.5, 2), b.z + rand(-1, 1), 3, [0x7fe8ff, 0xffffff], 3);
           if (b.building <= 0 && b.pendingUpgrade) finishBuild(b);
-        } else if (b.thinkT <= 0 && S.t - b.lastThink > 0.5) think(b);
+        } else if (b.thinkT <= 0 && S.t - b.lastThink > 0.5 && !orderActive(b)) think(b);
 
         // stuck against scenery? steer around it for a moment (there's no pathfinding)
         const gp = g.type === "hunt" && g.target.alive ? g.target : g.type === "item" ? g.item : g.type === "cp" ? g.cp : g.type === "point" ? g : null;
@@ -1432,6 +1438,7 @@
       }
     } else if (S.phase === "fight") {
       S.fightT += dt;
+      if (S.bots.some((b) => b.external)) { S.turnT = (S.turnT == null ? turnLength() : S.turnT) - dt; if (S.turnT <= 0 && !S.waiting) beginWait(); }
       if (S.mode === "rush") {
         updateCheckpoints(dt);
         S.rules = S.rules.filter((r) => r.until > S.fightT);
@@ -1502,6 +1509,9 @@
   }
   function finishRound(order) {
     const w = order[0];
+    S.finalOrder = order;
+    if (S.waiting) S.waiting = null;
+    setTimeout(() => S.bots.filter((b) => b.external).forEach((b) => writeReport(b.name, "round-over")), 50);
     S.phase = "results"; S.winner = w; S.resT = 10; S.pick = null; $("pick").hidden = true;
     const rush = S.mode === "rush";
     const pts = [10, 6, 4, 2, 2];
@@ -1566,7 +1576,8 @@
     const ring = new THREE.Mesh(new THREE.RingGeometry(CP_RADIUS - 0.5, CP_RADIUS, 48, 1, 0, 0.001), new THREE.MeshBasicMaterial({ color: lin(0xff5a36), side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.14; g.add(ring);
     dyn.add(g);
-    const cp = { x, z, revealed: false, capT: 0, holder: null, contested: false, g, gem, ring, pillar, shownP: 0, pop: 0 };
+    S.cpId = (S.cpId || 0) + 1;
+    const cp = { id: S.cpId, x, z, revealed: false, capT: 0, holder: null, contested: false, g, gem, ring, pillar, shownP: 0, pop: 0 };
     S.cps.push(cp);
     return cp;
   }
@@ -1609,11 +1620,12 @@
     if (S.pick) S.pickQueue.push({ b, hand }); else startPick(b, hand);
   }
   function ownerChoice(b, hand) {
+    if (b.rulePrefs) { const hit = b.rulePrefs.map((id) => hand.find((c) => c.id === id)).find(Boolean); if (hit) return hit; }
     const want = b.aggr > 0.75 ? ["glass", "turbo", "lowgrav"] : b.greed > 0.85 ? ["double", "crates", "tax"] : b.mode === "opportunist" || b.caution > 0.55 ? ["reveal", "jam", "freeze"] : b.spec.weapon === "flipper" ? ["lowgrav"] : [];
     return hand.find((c) => want.includes(c.id)) || pick(hand);
   }
   function startPick(b, hand) {
-    const human = selected !== null && S.bots[selected] === b && !document.hidden;
+    const human = !b.external && selected !== null && S.bots[selected] === b && !document.hidden;
     S.pick = { b, hand, human, t: rand(1.2, 2.4), deadline: performance.now() + 10000 };
     if (human) {
       $("pickTitle").innerHTML = `Your bot <b style="color:${hexStr(b.color)}">${esc(b.name)}</b> captured a checkpoint. Pick a rule for everyone:`;
@@ -1631,7 +1643,7 @@
     if (card.id === "reveal") S.cps.filter((c) => !c.revealed).forEach((c) => revealCp(c, null));
     if (card.id === "crates") for (let i = 0; i < 6; i++) { const a = rand(0, Math.PI * 2), d = rand(10, WORLD - 12); spawnCrate(Math.cos(a) * d, Math.sin(a) * d, false); }
     if (card.id === "tax") S.bots.forEach((o) => { if (o !== b) o.scrap = Math.floor(o.scrap / 2); });
-    const who = byViewer ? "You" : P.human ? `${b.name}'s agent (you ran out of time)` : `${b.name}'s owner`;
+    const who = byViewer ? "You" : P.human ? `${b.name}'s agent (you ran out of time)` : b.external ? `${b.name} (outside agent)` : `${b.name}'s owner`;
     feed(null, `<b style="color:${hexStr(b.color)}">${esc(who)}</b> played <b>${esc(card.name)}</b>: ${esc(card.text)}`, "rule");
     killFeed(`<b>${esc(card.name.toUpperCase())}</b> is in play`);
     S.bots.forEach((o) => { if (o.alive) { o.ruleReact = card.id; o.thinkT = Math.min(o.thinkT, rand(0.3, 1.5)); } });
@@ -1832,7 +1844,8 @@
   const fmtT = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   function feed(b, html, kind) {
     const li = document.createElement("li");
-    const tags = { evo: "evo-t EVOLVED", kill: "kill-t WRECK", drop: "drop-t CRATE", zone: "zone-t ARENA", join: "join-t JOINED", cp: "cp-t CHECKPOINT", rule: "rule-t RULE" };
+    const tags = { evo: "evo-t EVOLVED", kill: "kill-t WRECK", drop: "drop-t CRATE", zone: "zone-t ARENA", join: "join-t JOINED", cp: "cp-t CHECKPOINT", rule: "rule-t RULE", agent: "agent-t AGENT" };
+    if (S) { const tmp = document.createElement("div"); tmp.innerHTML = html; S.log = S.log || []; S.log.push(`${S.phase === "fight" ? fmtT(S.fightT) : "lobby"} ${b ? b.name + " " : ""}${kind ? "" : "thinks: "}${tmp.textContent}`); if (S.log.length > 40) S.log.shift(); }
     const tag = tags[kind] ? `<span class="tag ${tags[kind].split(" ")[0]}">${tags[kind].split(" ")[1]}</span>` : "";
     const who = b ? `<span class="n" style="color:${hexStr(b.color)}">${b.name}</span>` : "";
     li.innerHTML = `<time>${S && S.phase === "fight" ? fmtT(S.fightT) : "R" + round}</time><span>${tag}${who}${kind ? html : "“" + esc(html) + "”"}</span>`;
@@ -1863,7 +1876,8 @@
       const img = b.history[b.history.length - 1].img;
       if (r.imgSrc !== img) { r.img.src = img; r.imgSrc = img; }
       r.ver.textContent = "v" + b.gen;
-      r.sub.textContent = b.alive ? describe(b.spec) : S.mode === "rush" ? `Wrecked · back in ${Math.max(0, Math.ceil(b.respawnT))} s` : b.killedBy ? `Wrecked by ${b.killedBy.name}` : "Caught by the zone";
+      const status = b.alive ? describe(b.spec) : S.mode === "rush" ? `Wrecked · back in ${Math.max(0, Math.ceil(b.respawnT))} s` : b.killedBy ? `Wrecked by ${b.killedBy.name}` : "Caught by the zone";
+      r.sub.textContent = (b.external ? "AGENT · " : "") + status;
       r.bar.style.width = f * 100 + "%";
       r.bar.style.background = f > 0.5 ? "var(--good)" : f > 0.25 ? "var(--gold)" : "var(--bad)";
       r.k.textContent = S.mode === "rush" ? `${b.cps} ◆ · ${b.kills} wr` : `${b.kills} wreck${b.kills === 1 ? "" : "s"}`;
@@ -2011,11 +2025,153 @@
     }
     ui.modeBtn.textContent = `MODE: ${gameMode === "rush" ? "CHECKPOINT RUSH" : "LAST BOT STANDING"}${S.phase === "fight" && S.mode !== gameMode ? " (NEXT ROUND)" : ""}`;
     if (big !== lastCenter) { lastCenter = big; ui.centerBig.textContent = big; ui.centerBig.classList.remove("bump"); void ui.centerBig.offsetWidth; if (big) ui.centerBig.classList.add("bump"); }
+    if (S.waiting) line = `Waiting for ${S.waiting.names.filter((n) => !S.waiting.got.has(n)).join(", ")}'s orders · turn ${S.turnN} · ${Math.max(0, Math.ceil((90000 - (performance.now() - S.waiting.since)) / 1000))} s`;
     ui.centerLine.textContent = line; ui.centerLine.hidden = !line;
     const b = selected !== null ? S.bots[selected] : null;
     ui.sponsorBtn.disabled = sponsorCd > 0 || !b || !b.alive || S.phase !== "fight";
     ui.sponsorText.textContent = sponsorCd > 0 ? `CRATE READY IN ${Math.ceil(sponsorCd)}s ·` : "DROP CRATE ON";
   }
+
+  /* ================= OUTSIDE AGENTS (mailbox) =================
+     seats/<NAME>   {agent, instruction, color, turnSeconds, aggr, caution, greed, pref}  -> joins the next lobby
+     orders/<NAME>  {seq, goal:{type,...}, thought, hold, rulePrefs, ask}                 -> steers the bot live
+     reports/<NAME> written by this page at each turn pause, on ask, and at round end. */
+  let mbox = null;
+  const extSeats = {}, lastSeq = {};
+  const turnLength = () => clamp(Math.min(...Object.values(extSeats).map((x) => Number(x.turnSeconds) || 10)), 4, 30);
+  function goalValid(g) {
+    if (!g) return false;
+    if (g.type === "hunt") return g.target && g.target.alive;
+    if (g.type === "cp") return S.cps.includes(g.cp);
+    if (g.type === "item") return S.items.includes(g.item);
+    if (g.type === "flee") return g.from && g.from.alive;
+    return true;
+  }
+  const orderActive = (b) => b.external && b.orderUntil > S.t && goalValid(b.goal);
+
+  function seatToAgent(name, d) {
+    const col = /^#[0-9a-f]{6}$/i.test(d.color) ? parseInt(d.color.slice(1), 16) : 0x7b3fe4;
+    const n = (k, v) => clamp(Number.isFinite(+d[k]) ? +d[k] : v, 0, 1);
+    const base = { name, color: col, instr: String(d.instruction || "Outside agent.").slice(0, 160), aggr: n("aggr", 0.5), caution: n("caution", 0.45), greed: n("greed", 0.7), build: n("build", 0.7), pref: WEAPONS[d.pref] && d.pref !== "none" ? d.pref : "saw", mode: "nearest", external: true, rulePrefs: Array.isArray(d.rulePrefs) ? d.rulePrefs.map(String) : null };
+    let a = AGENTS.find((x) => x.name === name);
+    if (a) Object.assign(a, base); else { a = { ...base, wins: 0, points: 0, rounds: 0, wrecks: 0, cps: 0, memory: null }; AGENTS.push(a); }
+    return a;
+  }
+  function upgradeFromOrder(b, u, why) {
+    const s = b.spec, [k, v] = String(u || "").split(":");
+    let apply = null;
+    if (k === "armor" && s.armor < 3) apply = (x) => x.armor++;
+    else if (k === "weapon" && WEAPONS[v] && v !== "none" && v !== s.weapon) apply = (x) => { x.weapon = v; x.wlvl = 1; };
+    else if (k === "weapon-level" && s.weapon !== "none" && s.wlvl < 3) apply = (x) => x.wlvl++;
+    else if (k === "loco" && LOCO[v] && v !== s.loco) apply = (x) => (x.loco = v);
+    else if (k === "chassis" && CHASSIS[v] && v !== s.chassis) apply = (x) => (x.chassis = v);
+    else if (k === "size" && s.size < 3) apply = (x) => x.size++;
+    else if (k === "scanner" && (s.scanner || 0) < 2) apply = (x) => (x.scanner = (x.scanner || 0) + 1);
+    return apply ? { apply, reason: why || `Agent's choice: ${u}.`, w: 1 } : null;
+  }
+  function applyOrder(b, o) {
+    const g = (o && o.goal) || {}, why = String(o.thought || "").slice(0, 240);
+    let goal = null, err = null;
+    const byName = (n) => S.bots.find((x) => x.alive && x !== b && x.name === String(n || "").toUpperCase());
+    switch (g.type) {
+      case "checkpoint": { const cp = S.cps.find((c) => c.revealed && c.id === Number(g.id)); if (cp) goal = { type: "cp", cp }; else err = `There is no found checkpoint #${g.id}.`; break; }
+      case "hunt": { const t = byName(g.target); if (t) goal = { type: "hunt", target: t }; else err = `No living bot called ${g.target}.`; break; }
+      case "flee": { const t = byName(g.from) || S.bots.filter((x) => x.alive && x !== b).sort((p, q) => dist(p, b) - dist(q, b))[0]; if (t) goal = { type: "flee", from: t }; break; }
+      case "move": goal = { type: "point", x: clamp(+g.x || 0, -WORLD + 6, WORLD - 6), z: clamp(+g.z || 0, -WORLD + 6, WORLD - 6) }; break;
+      case "scavenge": { const it = S.items.filter((i) => i.kind !== "crate" || i.landed).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (it) goal = { type: "item", item: it }; else err = "No scrap left nearby."; break; }
+      case "build": {
+        if (b.building > 0) { err = "Already rebuilding."; break; }
+        if (ruleOn("freeze")) { err = "Build freeze is active."; break; }
+        if (b.scrap < cost(b)) { err = `Not enough scrap: ${b.scrap}/${cost(b)}.`; break; }
+        const up = upgradeFromOrder(b, g.upgrade, why);
+        if (!up) { err = `Can't apply upgrade "${g.upgrade}" to the current build.`; break; }
+        b.pendingUpgrade = up; b.building = 1.6; goal = { type: "build" }; break;
+      }
+      case "auto": b.orderUntil = 0; break;
+      case undefined: break;
+      default: err = `Unknown order type "${g.type}".`;
+    }
+    if (Array.isArray(o.rulePrefs)) b.rulePrefs = o.rulePrefs.map(String);
+    if (goal) { b.goal = goal; b.orderUntil = S.t + clamp(Number(o.hold) || 12, 3, 60); b.detour = null; }
+    if (why) { b.thought = why; b.thoughtAt = S.t; S.lastThinker = b; feed(b, esc(why), "agent"); b.heat = (b.heat || 0) + 2; }
+    b.lastOrder = { seq: o.seq, type: g.type || "none", ok: !err, error: err };
+    if (err) feed(b, `order failed: ${esc(err)}`, "agent");
+  }
+
+  function botBrief(o, me) {
+    return { name: o.name, x: Math.round(o.x), z: Math.round(o.z), dist: me ? Math.round(dist(o, me)) : undefined, hpPct: Math.round((o.hp / o.maxHp) * 100), weapon: o.spec.weapon, version: o.gen, build: describe(o.spec), checkpoints: o.cps, doing: o.goal.type, alive: o.alive };
+  }
+  async function writeReport(name, reason) {
+    if (!mbox || !S) return;
+    const b = S.bots.find((x) => x.name === name);
+    const rep = { reason, writtenAt: new Date().toISOString(), round, mode: S.mode, phase: S.phase, turn: S.turnN || 0, waitingForYou: !!(S.waiting && S.waiting.names.includes(name) && !S.waiting.got.has(name)), lastOrderSeq: lastSeq[name] || 0 };
+    if (S.phase === "fight" || S.phase === "results") rep.timeLeft = S.mode === "rush" ? Math.max(0, Math.round(RUSH_TIME - S.fightT)) : null;
+    if (b) {
+      rep.you = { ...botBrief(b), heading: Math.round(((-b.h * 180) / Math.PI + 450) % 360), maxHp: b.maxHp, hp: Math.round(b.hp), scrap: b.scrap, upgradeCost: cost(b), building: b.building > 0, spec: b.spec, speed: r1(b.st.speed), scanRange: Math.round(b.st.scan), wrecks: b.kills, deaths: b.deaths, respawnIn: b.alive ? 0 : Math.ceil(b.respawnT), orderActive: orderActive(b), lastOrder: b.lastOrder || null };
+      rep.nearbyBots = S.bots.filter((o) => o !== b && o.alive && dist(o, b) < 110).sort((p, q) => dist(p, b) - dist(q, b)).slice(0, 8).map((o) => botBrief(o, b));
+      rep.foundCheckpoints = S.cps.filter((c) => c.revealed).map((c) => ({ id: c.id, x: Math.round(c.x), z: Math.round(c.z), dist: Math.round(Math.hypot(c.x - b.x, c.z - b.z)), captureProgress: r1(c.capT / CP_HOLD), holder: c.holder ? c.holder.name : null, contested: c.contested }));
+      rep.hiddenCheckpoints = S.cps.filter((c) => !c.revealed).length;
+      rep.nearestItems = S.items.filter((i) => i.kind !== "crate" || i.landed).map((i) => ({ kind: i.kind, value: i.value, x: Math.round(i.x), z: Math.round(i.z), dist: Math.round(Math.hypot(i.x - b.x, i.z - b.z)) })).sort((p, q) => p.dist - q.dist).slice(0, 6);
+    }
+    rep.activeRules = S.rules.map((r) => ({ id: r.id, name: r.name, secondsLeft: Math.max(0, Math.ceil(r.until - S.fightT)) }));
+    rep.leaderboard = S.bots.slice().sort((p, q) => q.cps - p.cps || q.kills - p.kills).slice(0, 6).map((o) => ({ name: o.name, checkpoints: o.cps, wrecks: o.kills }));
+    rep.recentEvents = (S.log || []).slice(-14);
+    if (reason === "round-over" && S.finalOrder) rep.finalStandings = S.finalOrder.slice(0, 15).map((o, i) => ({ place: i + 1, name: o.name, checkpoints: o.cps, wrecks: o.kills, deaths: o.deaths }));
+    rep.orderFormat = 'Write orders/' + name + ' = {"seq": <bigger than lastOrderSeq>, "goal": {"type": "checkpoint", "id": 3} | {"type": "hunt", "target": "NAME"} | {"type": "move", "x": 0, "z": 0} | {"type": "scavenge"} | {"type": "flee", "from": "NAME"} | {"type": "build", "upgrade": "armor" | "weapon:saw|ram|hammer|spinner|flipper|cannon" | "weapon-level" | "loco:wheels6|hover|treads" | "chassis:wedge|dome|tank" | "size" | "scanner"} | {"type": "auto"}, "thought": "why (shown in your thought bubble)", "hold": 12, "rulePrefs": ["glass", "reveal", ...]}';
+    try { await mbox.doc("reports/" + name).set(JSON.parse(JSON.stringify(rep))); } catch (e) { agentNote(`Couldn't write ${name}'s report (${e.code || "error"}).`); }
+  }
+
+  function beginWait() {
+    const names = S.bots.filter((b) => b.external).map((b) => b.name);
+    if (!names.length) return;
+    S.turnN = (S.turnN || 0) + 1;
+    S.waiting = { since: performance.now(), names, got: new Set() };
+    names.forEach((n) => writeReport(n, "turn"));
+  }
+  function endWait(timedOut) {
+    if (!S.waiting) return;
+    if (timedOut) S.waiting.names.filter((n) => !S.waiting.got.has(n)).forEach((n) => { const b = S.bots.find((x) => x.name === n); if (b) feed(b, "didn't answer in time; its autopilot keeps driving.", "agent"); });
+    S.waiting = null; S.turnT = turnLength();
+  }
+  function agentNote(t) { $("agentNote").textContent = t; }
+  function refreshAgentNote() {
+    const names = Object.keys(extSeats);
+    agentNote(!mbox ? "The mailbox isn't available in this view, so outside agents can't join here." : names.length ? `Outside agents seated: ${names.join(", ")}. ${S && S.bots.some((b) => b.external) ? "Playing this round." : "Joining the next lobby."}` : "No outside agents yet. An agent joins by writing seats/<NAME> through the mailbox.");
+  }
+
+  (async () => {
+    try { mbox = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { mbox = null; }
+    refreshAgentNote();
+    if (!mbox) return;
+    mbox.collection("seats").onSnapshot((snap) => {
+      for (const k of Object.keys(extSeats)) delete extSeats[k];
+      for (const doc of snap.docs) {
+        const d = doc.data(); if (!d || d.active === false) continue;
+        const name = String(doc.id).toUpperCase().slice(0, 12);
+        extSeats[name] = d;
+        const a = seatToAgent(name, d);
+        // seat an agent straight into a lobby that is still filling
+        if (S && S.phase === "lobby" && !S.bots.some((b) => b.agent === a) && !S.queue.includes(a)) { if (S.bots.length + S.queue.length >= LOBBY_SIZE) S.queue.pop(); S.queue.unshift(a); }
+      }
+      refreshAgentNote();
+    }, (e) => agentNote(`Mailbox disconnected (${e.code}). Reload to reconnect.`));
+    let first = true;
+    mbox.collection("orders").onSnapshot((snap) => {
+      for (const doc of snap.docs) {
+        const d = doc.data(); if (!d) continue;
+        const name = String(doc.id).toUpperCase().slice(0, 12), seq = Number(d.seq) || 0;
+        if (seq <= (lastSeq[name] || 0)) continue;
+        lastSeq[name] = seq;
+        if (first) continue; // ignore orders left over from before this page loaded
+        const b = S && S.bots.find((x) => x.name === name);
+        if (b && S.phase === "fight" && b.alive) applyOrder(b, d);
+        else if (b) { if (Array.isArray(d.rulePrefs)) b.rulePrefs = d.rulePrefs.map(String); if (d.thought) { b.thought = String(d.thought).slice(0, 240); b.thoughtAt = S.t; } }
+        if (S && S.waiting && S.waiting.names.includes(name)) { S.waiting.got.add(name); if (S.waiting.got.size >= S.waiting.names.length) endWait(false); }
+        if (d.ask) setTimeout(() => writeReport(name, "asked"), 30);
+      }
+      first = false;
+    }, (e) => agentNote(`Mailbox disconnected (${e.code}). Reload to reconnect.`));
+  })();
 
   /* ================= LOOP ================= */
   let last = performance.now(), uiT = 0, hudT = 0, vt = 0;
@@ -2023,7 +2179,8 @@
     const rdt = Math.min(0.05, (now - last) / 1000); last = now;
     const simDt = rdt * speed;
     const sub = Math.ceil(simDt / 0.034);
-    for (let i = 0; i < sub; i++) step(simDt / sub);
+    if (S.waiting) { if (now - S.waiting.since > 90000) endWait(true); }
+    else for (let i = 0; i < sub; i++) step(simDt / sub);
     vt += rdt;
     sponsorCd = Math.max(0, sponsorCd - rdt);
     syncVisuals(simDt, vt);
