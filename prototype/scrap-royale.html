@@ -320,7 +320,7 @@
   const scene = new THREE.Scene();
   scene.background = lin(GROUND);
   scene.fog = new THREE.Fog(lin(GROUND), 150, 260); // pushed out every frame so it only softens the horizon
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 400);
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 3000);
 
   scene.add(new THREE.HemisphereLight(lin(0xfff4e0), lin(0xd07a40), 0.75));
   const sun = new THREE.DirectionalLight(lin(0xfff1dc), 0.95);
@@ -364,7 +364,7 @@
   /* ================= WORLD ================= */
   const WORLD = 260; // ~40x the area of the first version: room to explore
   const obstacles = [];
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), toy(GROUND, 1, 0));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), toy(GROUND, 1, 0));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
   scene.add(ground);
   // painted arena markings
@@ -1748,7 +1748,7 @@
       if (S.phase === "lobby") { want = 62; }
       else if (S.phase === "countdown") { want = WORLD * 2.1; }
       else if (S.phase === "results" && S.winner) { cx = S.winner.x; cz = S.winner.z; want = 34; }
-      else if (camMode === "overview") { cx = S.zone.cx; cz = S.zone.cz; want = clamp(S.zone.r * 2.3 + 30, 50, WORLD * 2.6); }
+      else if (camMode === "overview") { cx = S.zone.phase === "off" ? 0 : S.zone.cx; cz = S.zone.phase === "off" ? 0 : S.zone.cz; want = clamp(Math.min(S.zone.r, WORLD) * 2.3 + 30, 50, WORLD * 2.4); }
       else {
         const f = pickFocus();
         if (f) {
