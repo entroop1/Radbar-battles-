@@ -85,6 +85,17 @@
   .budget .bar { flex: 1; height: 10px; background: var(--panel-2); border-radius: 5px; overflow: hidden; }
   .budget .bar div { height: 100%; background: var(--gold); }
 
+  .mailbox { border-top: 2px dashed var(--line-strong); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .mb-status { font-size: 13.5px; font-weight: 700; display: flex; gap: 8px; align-items: center; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-soft); flex: none; }
+  .dot.on { background: var(--good); box-shadow: 0 0 0 4px rgba(34,168,103,0.18); }
+  .dot.busy { background: var(--gold); }
+  .mailbox textarea { font: 500 12px/1.4 var(--mono); min-height: 110px; }
+  .mailbox pre { font: 500 11px/1.45 var(--mono); background: var(--panel-2); padding: 8px; border-radius: 8px; overflow: auto; max-height: 260px; white-space: pre-wrap; margin: 6px 0 0; }
+  .lineage { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lineage select { font: 700 14px var(--body); color: var(--ink); background: var(--panel-2); border: 2px solid transparent; border-radius: 10px; padding: 6px 10px; }
+  .lineage select:focus-visible { outline: 3px solid var(--violet); }
+
   /* Design card */
   .idea { margin: 0; font-weight: 800; font-size: 16px; }
   .reason { margin: 0; padding: 10px 12px; background: #efe6ff; border-radius: 10px; font-size: 14px; }
@@ -176,6 +187,16 @@
       <div class="status" id="status" role="status" aria-live="polite"></div>
       <pre class="stream" id="stream" hidden></pre>
       <p class="note">Each version: the agent designs → the game builds it and works out its speed, weight, power, balance and weapons from the parts → it fights three test robots → the report goes back to the agent for the next version.</p>
+      <div class="mailbox">
+        <h2>Agent mailbox</h2>
+        <div class="mb-status"><span class="dot" id="mbDot"></span><span id="mbStatus">Connecting…</span></div>
+        <details><summary>How an outside agent joins</summary><pre id="mbHelp"></pre></details>
+        <details><summary>Paste a design (JSON)</summary>
+          <label class="lbl" for="pasteBox" style="margin-top:6px">Any AI's design in the format above</label>
+          <textarea id="pasteBox" spellcheck="false" placeholder='{"name":"MY BOT","idea":"...","tactics":{"approach":"charge","preferredRange":0},"parts":[...]}'></textarea>
+          <div class="btnrow" style="margin-top:6px"><button class="btn ghost" id="pasteBtn" type="button">TEST THIS DESIGN</button></div>
+        </details>
+      </div>
     </section>
   </div>
 
@@ -202,7 +223,7 @@
   </div>
 
   <section class="card" aria-label="Evolution">
-    <h2>Evolution</h2>
+    <div class="lineage"><h2>Evolution of</h2><select id="lineage" aria-label="Which agent's evolution to show"></select></div>
     <div class="timeline" id="timeline"></div>
     <p class="note" id="timelineNote"></p>
   </section>
@@ -1002,7 +1023,8 @@ Reply with only a JSON object, no other text:
   requestAnimationFrame(frame);
 
   /* ===================== LAB STATE + UI ===================== */
-  const lab = { versions: [], selected: -1, busy: false, example: true, sample: null, demo: true, ctl: null };
+  const lab = { local: [], remote: {}, view: "local", selected: -1, busy: false, example: true, sample: null, demo: true, ctl: null, db: null };
+  Object.defineProperty(lab, "versions", { get() { return lab.view === "local" ? lab.local : (lab.remote[lab.view] || { versions: [] }).versions; }, set(v) { lab.local = v; } });
   const CHIPS = ["Build something that can't be flipped.", "Be the fastest bot in the arena.", "Win with one giant weapon.", "Cheap, tough and annoying.", "Fight from a distance.", "Surprise me."];
   $("chips").innerHTML = CHIPS.map((c) => `<button class="chip" type="button">${esc(c)}</button>`).join("");
   $("chips").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) $("instr").value = b.textContent; });
@@ -1010,13 +1032,14 @@ Reply with only a JSON object, no other text:
 
   function addVersion(design, notes, source) {
     design.parts.forEach((p) => (p.id = p.id || Math.random().toString(36).slice(2)));
-    const n = lab.versions.length + 1;
+    lab.view = "local";
+    const n = lab.local.length + 1;
     const st = derive(design.parts);
     const v = { n, design, notes, st, source, allNotes: [...notes, ...st.notes] };
     v.results = gauntlet(design, n);
     v.thumb = thumb(design);
-    lab.versions.push(v);
-    lab.selected = lab.versions.length - 1;
+    lab.local.push(v);
+    lab.selected = lab.local.length - 1;
     render();
     showGarage(design);
     return v;
@@ -1024,14 +1047,18 @@ Reply with only a JSON object, no other text:
 
   function render() {
     const v = lab.versions[lab.selected];
-    $("designBtn").textContent = lab.busy ? "DESIGNING…" : lab.example || !lab.versions.length ? "DESIGN V1" : `EVOLVE → V${lab.versions.length + 1}`;
+    $("designBtn").textContent = lab.busy ? "DESIGNING…" : lab.example || !lab.local.length ? "DESIGN V1" : `EVOLVE → V${lab.local.length + 1}`;
+    const opts = [["local", lab.example ? "Example agent" : `${($("agentName").value || "Your agent").toUpperCase()} (this page)`], ...Object.entries(lab.remote).map(([k, r]) => [k, `${k} (mailbox · ${r.versions.length} version${r.versions.length === 1 ? "" : "s"})`])];
+    const sel = $("lineage"), optKey = opts.map((o) => o.join("|")).join() + lab.view;
+    if (sel._k !== optKey) { sel._k = optKey; sel.innerHTML = opts.map(([k, t]) => `<option value="${esc(k)}"${k === lab.view ? " selected" : ""}>${esc(t)}</option>`).join(""); }
     $("designBtn").disabled = lab.busy;
     $("stopBtn").hidden = !lab.busy || lab.demo;
     $("restartBtn").disabled = lab.busy;
     $("replayBtn").disabled = !v;
     if (!v) return;
     const d = v.design, st = v.st;
-    $("dTitle").textContent = `${lab.example ? "Example · " : ""}Version ${v.n}${v.source === "claude" ? " · designed by Claude" : v.source === "demo" ? " · demo designer" : ""}`;
+    const srcTxt = { claude: " · designed by Claude", demo: " · demo designer", pasted: " · pasted design", mailbox: ` · ${v.agent} via mailbox` }[v.source] || "";
+    $("dTitle").textContent = `${lab.example && lab.view === "local" ? "Example · " : ""}Version ${v.n}${srcTxt}`;
     $("dName").textContent = d.name; $("dName").style.color = d.color;
     $("dIdea").textContent = d.idea;
     $("dReasonTxt").textContent = d.reasoning || "—";
@@ -1047,14 +1074,15 @@ Reply with only a JSON object, no other text:
     $("dRaw").textContent = JSON.stringify({ name: d.name, tactics: d.tactics, parts: d.parts.map(({ cost, id, ...p }) => p) }, null, 1);
     $("tests").innerHTML = v.results.map((r, i) => `<div class="test"><span class="test-h">vs ${r.opp} <span class="res ${r.res}">${r.res === "W" ? "WIN" : r.res === "L" ? "LOSS" : "DRAW"}</span></span><button class="ctl" type="button" data-replay="${i}">WATCH</button><ul>${r.lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>`).join("");
     $("reportTxt").textContent = reportText(v);
-    $("timeline").innerHTML = lab.versions.map((x, i) => `<button class="ver ${i === lab.selected ? "sel" : ""}" type="button" data-v="${i}"><img src="${x.thumb}" alt=""><b style="color:${x.design.color}">v${x.n} ${esc(x.design.name)}</b><span class="rec">${x.results.map((r) => `<i class="${r.res}">${r.res}</i>`).join("")}</span><small>${esc(x.design.idea).slice(0, 70)}</small><span class="src">${x.source === "claude" ? "CLAUDE" : x.source === "demo" ? "DEMO DESIGNER" : "EXAMPLE"}</span></button>`).join("");
-    $("timelineNote").textContent = lab.example ? "This is an example so the page isn't empty. Press Design v1 to start your own agent." : `${lab.versions.length} version${lab.versions.length > 1 ? "s" : ""}. Click one to inspect it.`;
+    $("timeline").innerHTML = lab.versions.map((x, i) => `<button class="ver ${i === lab.selected ? "sel" : ""}" type="button" data-v="${i}"><img src="${x.thumb}" alt=""><b style="color:${x.design.color}">v${x.n} ${esc(x.design.name)}</b><span class="rec">${x.results.map((r) => `<i class="${r.res}">${r.res}</i>`).join("")}</span><small>${esc(x.design.idea).slice(0, 70)}</small><span class="src">${({ claude: "CLAUDE", demo: "DEMO DESIGNER", pasted: "PASTED", mailbox: "MAILBOX" })[x.source] || "EXAMPLE"}</span></button>`).join("");
+    $("timelineNote").textContent = lab.view !== "local" ? `${lab.view}'s instruction: “${(lab.remote[lab.view] || {}).instruction || ""}”. Designs arrive through the mailbox and are tested in this tab.` : lab.example ? "This is an example so the page isn't empty. Press Design v1 to start your own agent." : `${lab.versions.length} version${lab.versions.length > 1 ? "s" : ""}. Click one to inspect it.`;
   }
   $("tests").addEventListener("click", (e) => { const b = e.target.closest("[data-replay]"); if (!b) return; const v = lab.versions[lab.selected]; startReplay(v.design, +b.dataset.replay, v.results[+b.dataset.replay].seed); stage.scrollIntoView({ behavior: "smooth", block: "nearest" }); });
+  $("lineage").addEventListener("change", (e) => { lab.view = e.target.value; lab.selected = lab.versions.length - 1; render(); if (lab.versions[lab.selected]) showGarage(lab.versions[lab.selected].design); });
   $("timeline").addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (!b) return; lab.selected = +b.dataset.v; render(); showGarage(lab.versions[lab.selected].design); });
   $("viewGarage").addEventListener("click", () => { const v = lab.versions[lab.selected]; if (v) showGarage(v.design); });
   $("replayBtn").addEventListener("click", () => { const v = lab.versions[lab.selected]; if (!v) return; const i = Math.max(0, v.results.findIndex((r) => r.res !== "W")); startReplay(v.design, i, v.results[i].seed); });
-  $("restartBtn").addEventListener("click", () => { lab.versions = []; lab.selected = -1; lab.example = false; setStatus(""); render(); showGarage(null); $("dName").textContent = ""; $("dIdea").textContent = ""; $("dReasonTxt").textContent = ""; $("dStats").innerHTML = ""; $("dNotes").innerHTML = ""; $("dParts").innerHTML = ""; $("tests").innerHTML = ""; $("timeline").innerHTML = ""; $("timelineNote").textContent = "Give your agent an instruction and press Design v1."; $("dTitle").textContent = "Design"; });
+  $("restartBtn").addEventListener("click", () => { lab.local = []; lab.view = "local"; lab.selected = -1; lab.example = false; setStatus(""); render(); showGarage(null); $("dName").textContent = ""; $("dIdea").textContent = ""; $("dReasonTxt").textContent = ""; $("dStats").innerHTML = ""; $("dNotes").innerHTML = ""; $("dParts").innerHTML = ""; $("tests").innerHTML = ""; $("timeline").innerHTML = ""; $("timelineNote").textContent = "Give your agent an instruction and press Design v1."; $("dTitle").textContent = "Design"; });
 
   function setStatus(t, err) { $("status").textContent = t; $("status").className = "status" + (err ? " err" : ""); }
   const ERR = {
@@ -1069,24 +1097,25 @@ Reply with only a JSON object, no other text:
 
   async function designNext() {
     if (lab.busy) return;
-    if (lab.example) { lab.versions = []; lab.selected = -1; lab.example = false; }
+    if (lab.example) { lab.local = []; lab.selected = -1; lab.example = false; }
+    lab.view = "local";
     const name = ($("agentName").value.trim() || "AGENT").slice(0, 20), instr = ($("instr").value.trim() || "Surprise me.").slice(0, 240);
     lab.busy = true; render();
     $("stream").hidden = true; $("stream").textContent = "";
     try {
       let raw, source;
       if (!lab.demo && lab.sample) {
-        setStatus(`${name} is thinking about version ${lab.versions.length + 1}… (usually 20–60 s)`);
+        setStatus(`${name} is thinking about version ${lab.local.length + 1}… (usually 20–60 s)`);
         lab.ctl = new AbortController();
-        raw = await lab.sample.json(buildPrompt(name, instr, lab.versions), {
+        raw = await lab.sample.json(buildPrompt(name, instr, lab.local), {
           signal: lab.ctl.signal, cache: false, modelTier: "default",
           onText: ({ text }) => { $("stream").hidden = false; $("stream").textContent = text.slice(-1500); $("stream").scrollTop = 1e6; setStatus(`${name} is writing the design… (${text.length} characters)`); },
         });
         source = "claude";
       } else {
-        setStatus(`Demo designer is building version ${lab.versions.length + 1}…`);
+        setStatus(`Demo designer is building version ${lab.local.length + 1}…`);
         await new Promise((r) => setTimeout(r, 500));
-        raw = demoDesigner(name, instr, lab.versions, mulberry32(Date.now() & 0xffff));
+        raw = demoDesigner(name, instr, lab.local, mulberry32(Date.now() & 0xffff));
         source = "demo";
       }
       const { design, notes } = sanitize(raw);
@@ -1115,10 +1144,124 @@ Reply with only a JSON object, no other text:
     else { m.className = "mode"; m.textContent = "Demo designer: Claude can't be reached in this view, so a simple scripted designer stands in. Open this page on claude.ai to have Claude design."; }
   }
 
+  // Paste any agent's design JSON and test it in the local lineage.
+  $("pasteBtn").addEventListener("click", () => {
+    let raw;
+    try { raw = JSON.parse($("pasteBox").value); } catch (e) { setStatus("That isn't valid JSON. Paste the design object only.", true); return; }
+    if (lab.example) { lab.local = []; lab.example = false; }
+    const { design, notes } = sanitize(raw);
+    if (!design.parts.length) { setStatus("That design has no usable parts.", true); return; }
+    const v = addVersion(design, notes, "pasted");
+    const w = v.results.filter((r) => r.res === "W").length;
+    setStatus(`Pasted design tested: ${w} win${w === 1 ? "" : "s"} out of 3.`);
+    const i = Math.max(0, v.results.findIndex((r) => r.res !== "W"));
+    setTimeout(() => startReplay(v.design, i, v.results[i].seed), 400);
+  });
+
+  /* ===================== MAILBOX =====================
+     Outside agents write designs to the shared "submissions" collection with
+     status "pending". Any open copy of this page claims one with a short lease,
+     builds and tests it, and writes the report back to the same document. */
+  const TAB = "tab-" + Math.random().toString(36).slice(2, 10);
+  const claimed = new Set(), seenTested = new Map();
+  $("mbHelp").textContent = `Write one document per design to the collection "submissions".
+Document id: <AGENT>-v<n>, e.g. CLAUDE-CODE-v1
+
+{
+  "agent": "CLAUDE-CODE",           // your agent's name
+  "n": 1,                           // version number
+  "instruction": "your owner's one instruction",
+  "status": "pending",
+  "design": {"name": "...", "idea": "...", "reasoning": "...", "color": "#rrggbb",
+             "tactics": {"approach": "charge", "preferredRange": 0},
+             "parts": [ ... ]}
+}
+
+While this page is open somewhere, it builds and tests the design within a few seconds and updates the same document with:
+status "tested" (or "error"), report (text), results (per opponent), notes, stats, and built (the design exactly as built).
+
+${CATALOG}`;
+  function mbSet(text, state) { $("mbStatus").textContent = text; $("mbDot").className = "dot" + (state ? " " + state : ""); }
+  const hashStr = (t) => { let h = 7; for (const ch of String(t)) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h) % 997; };
+
+  async function processSubmission(ref) {
+    if (claimed.has(ref.id)) return;
+    claimed.add(ref.id);
+    try {
+      const lease = await ref.acquire({ holder: TAB, ttlMs: 30000 });
+      if (!lease.acquired) return;
+      const snap = await ref.get(), d = snap.exists ? snap.data() : null;
+      if (!d || d.status !== "pending") return;
+      const agent = String(d.agent || "AGENT").slice(0, 24).toUpperCase();
+      mbSet(`Testing ${agent} v${d.n}…`, "busy");
+      const { design, notes } = sanitize(d.design || {});
+      if (!design.parts.length) { await ref.update({ status: "error", error: "No usable parts: nothing could be built.", notes: notes.map((x) => x.t), testedAt: new Date().toISOString() }); return; }
+      design.parts.forEach((p) => (p.id = Math.random().toString(36).slice(2)));
+      const n = Math.max(1, Math.round(Number(d.n) || 1));
+      const st = derive(design.parts);
+      const v = { n, design, notes, st, allNotes: [...notes, ...st.notes] };
+      v.results = gauntlet(design, n + hashStr(agent));
+      await ref.update({
+        status: "tested", testedAt: new Date().toISOString(), testedBy: TAB,
+        report: reportText(v),
+        results: v.results.map((r) => ({ opp: r.opp, res: r.res, lines: r.lines, seed: r.seed })),
+        notes: v.allNotes.map((x) => ({ k: x.k, t: x.t })),
+        stats: { scrap: r1(design.spent), weight: r1(st.mass), health: Math.round(st.hp), speed: r1(st.speed), power: `${r1(st.draw)}/${st.capacity}`, flipResist: st.flipResist, frontEdgeCm: Math.round(st.frontLow * 100), weapons: st.weapons.map((w) => w.kind), selfRight: st.selfRight, driveUpsideDown: st.invertible },
+        built: { name: design.name, idea: design.idea, reasoning: design.reasoning, color: design.color, tactics: design.tactics, parts: design.parts.map(({ cost, id, ...p }) => p) },
+      });
+    } catch (e) {
+      mbSet(`Couldn't test a submission (${(e && e.code) || "error"}). It stays pending for another try.`);
+      claimed.delete(ref.id);
+    }
+  }
+
+  function absorbTested(id, d) {
+    const key = id + "|" + d.testedAt;
+    if (seenTested.get(id) === key || !d.built || !Array.isArray(d.results)) return false;
+    seenTested.set(id, key);
+    const agent = String(d.agent || "AGENT").slice(0, 24).toUpperCase();
+    const { design } = sanitize(d.built);
+    design.reasoning = String(d.built.reasoning || "");
+    design.parts.forEach((p) => (p.id = Math.random().toString(36).slice(2)));
+    const st = derive(design.parts);
+    const notes = Array.isArray(d.notes) ? d.notes.map((x) => (typeof x === "string" ? { k: "warn", t: x } : { k: x.k || "warn", t: String(x.t) })) : st.notes;
+    const L = (lab.remote[agent] = lab.remote[agent] || { versions: [], instruction: "" });
+    L.instruction = String(d.instruction || L.instruction || "").slice(0, 240);
+    const v = { n: Math.round(Number(d.n) || 1), design, notes: [], st, allNotes: notes, results: d.results.map((r) => ({ opp: String(r.opp), res: ["W", "L", "D"].includes(r.res) ? r.res : "D", lines: (r.lines || []).map(String), seed: Number(r.seed) || 1 })), source: "mailbox", agent, thumb: thumb(design) };
+    const at = L.versions.findIndex((x) => x.n === v.n);
+    if (at >= 0) L.versions[at] = v; else L.versions.push(v);
+    L.versions.sort((a, b) => a.n - b.n);
+    return { agent, v };
+  }
+
+  (async () => {
+    try { lab.db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { lab.db = null; }
+    if (!lab.db) { mbSet("The mailbox isn't available in this view. Open this page on claude.ai for outside agents to join."); return; }
+    mbSet("Mailbox open. Waiting for outside agents' designs.", "on");
+    let first = true;
+    lab.db.collection("submissions").onSnapshot((snap) => {
+      let newest = null;
+      for (const doc of snap.docs) {
+        const d = doc.data(); if (!d) continue;
+        if (d.status === "pending") setTimeout(() => processSubmission(lab.db.doc("submissions/" + doc.id)), 0);
+        else if (d.status === "tested") { const got = absorbTested(doc.id, d); if (got && !first && (!newest || String(d.testedAt) > newest.t)) newest = { ...got, t: String(d.testedAt) }; }
+      }
+      const agents = Object.keys(lab.remote);
+      mbSet(agents.length ? `Mailbox open · ${agents.length} outside agent${agents.length > 1 ? "s" : ""} (${agents.join(", ")}) · ${snap.size} design${snap.size === 1 ? "" : "s"} received.` : "Mailbox open. Waiting for outside agents' designs.", "on");
+      if (newest && !lab.busy) {
+        lab.view = newest.agent; lab.selected = lab.versions.indexOf(newest.v);
+        render(); setStatus(`${newest.agent} sent v${newest.v.n} through the mailbox: ${newest.v.results.filter((r) => r.res === "W").length} win(s) out of 3.`);
+        const i = Math.max(0, newest.v.results.findIndex((r) => r.res !== "W"));
+        startReplay(newest.v.design, i, newest.v.results[i].seed);
+      } else render();
+      first = false;
+    }, (e) => mbSet(`Mailbox disconnected (${e.code}). Reload the page to reconnect.`));
+  })();
+
   // Example lineage so the page opens in a working state.
   (() => {
     const rng = mulberry32(7);
-    for (let i = 0; i < 2; i++) { const { design, notes } = sanitize(demoDesigner("EXAMPLE", "Build something that can't be flipped.", lab.versions, rng)); addVersion(design, notes, "example"); }
+    for (let i = 0; i < 2; i++) { const { design, notes } = sanitize(demoDesigner("EXAMPLE", "Build something that can't be flipped.", lab.local, rng)); addVersion(design, notes, "example"); }
     lab.example = true; render();
   })();
 
