@@ -82,6 +82,7 @@
   }
   .bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; }
   .bubble b { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; }
+  .stage .minimap { position: absolute; right: 14px; bottom: 58px; width: 160px; height: 160px; border-radius: 50%; box-shadow: 0 4px 0 rgba(0,0,0,0.14); pointer-events: none; }
   .nogl { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: #fff; font-weight: 800; }
 
   .results { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(43, 29, 22, 0.28); }
@@ -173,7 +174,8 @@
     dl.kv { grid-template-columns: repeat(2, 1fr); }
     .hint { display: none; }
     .bubble { max-width: 180px; font-size: 12px; }
-    .killfeed { top: auto; bottom: 96px; max-width: 70%; }
+    .killfeed { top: auto; bottom: 96px; left: 14px; right: auto; align-items: flex-start; max-width: 60%; }
+    .stage .minimap { width: 96px; height: 96px; top: 14px; right: 14px; bottom: auto; }
     .kf:nth-child(n+3) { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { .pill i, .kf, .res-card, .center .huge.bump { animation: none; } }
@@ -194,8 +196,12 @@
     <div class="killfeed" id="killfeed"></div>
     <div class="center" id="center"><div class="huge" id="centerBig"></div><div class="line" id="centerLine"></div></div>
     <div class="bubble" id="bubble" hidden></div>
+    <canvas class="minimap" id="minimap" width="320" height="320" aria-label="Minimap"></canvas>
     <div class="controls">
-      <button class="ctl" id="overviewBtn" type="button" aria-pressed="true">OVERVIEW</button>
+      <div class="seg" role="group" aria-label="Camera">
+        <button class="ctl" id="actionBtn" type="button" aria-pressed="true">ACTION CAM</button>
+        <button class="ctl" id="overviewBtn" type="button" aria-pressed="false">WHOLE MAP</button>
+      </div>
       <div class="seg" role="group" aria-label="Speed">
         <button class="ctl" type="button" data-speed="1" aria-pressed="true">1×</button>
         <button class="ctl" type="button" data-speed="2" aria-pressed="false">2×</button>
@@ -331,7 +337,7 @@
   }
 
   /* ================= WORLD ================= */
-  const WORLD = 42;
+  const WORLD = 130; // ~10x the area of the first version
   const obstacles = [];
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), toy(GROUND, 1, 0));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
@@ -348,29 +354,49 @@
     const m = new THREE.Mesh(new THREE.PlaneGeometry(WORLD * 2 + 1, WORLD * 2 + 1), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
     m.rotation.x = -Math.PI / 2; m.position.y = 0.01; scene.add(m);
   })();
-  // static toy blocks
+  // static toy blocks and trees scattered over the whole map (the middle stays open for the lobby)
   const BLOCK_COLORS = [0x6ec6ff, 0xffd166, 0x9b7bff, 0x4fd18b, 0xff7eb6, 0xffffff];
+  const freeSpot = (minD, maxD, gap) => {
+    for (let t = 0; t < 40; t++) {
+      const a = rand(0, Math.PI * 2), d = Math.sqrt(rand(minD * minD, maxD * maxD));
+      const x = Math.cos(a) * d, z = Math.sin(a) * d;
+      if (!obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + gap)) return [x, z];
+    }
+    return null;
+  };
   (() => {
-    const spots = [[-22, -14], [20, -20], [-16, 22], [24, 16], [0, -30], [-31, 4], [31, -3], [4, 30], [-26, -28], [27, 29]];
-    spots.forEach(([x, z], i) => {
-      const kind = i % 3, col = BLOCK_COLORS[i % BLOCK_COLORS.length];
+    for (let i = 0; i < 46; i++) {
+      const spot = freeSpot(26, WORLD - 8, 8); if (!spot) continue;
+      const [x, z] = spot, kind = i % 3, col = BLOCK_COLORS[i % BLOCK_COLORS.length];
       if (kind === 0) {
-        const s = rand(2.6, 3.6);
-        const m = mesh(rbox(s, s, s, 0.3), toy(col), x, s / 2, z, scene); m.rotation.y = rand(0, 3);
-        obstacles.push({ x, z, r: s * 0.62 });
+        const sz = rand(2.6, 5);
+        const m = mesh(rbox(sz, sz, sz, 0.35), toy(col), x, sz / 2, z, scene); m.rotation.y = rand(0, 3);
+        obstacles.push({ x, z, r: sz * 0.62 });
       } else if (kind === 1) {
-        const r = rand(1.3, 1.9), h = rand(2, 4);
+        const r = rand(1.3, 2.4), h = rand(2, 6);
         mesh(new THREE.CylinderGeometry(r, r, h, 28), toy(col), x, h / 2, z, scene);
         obstacles.push({ x, z, r: r + 0.1 });
       } else {
-        // arch: two legs and a top
         const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rand(0, 3); scene.add(g);
         mesh(rbox(1, 3, 1, 0.2), toy(col), -2, 1.5, 0, g); mesh(rbox(1, 3, 1, 0.2), toy(col), 2, 1.5, 0, g);
         mesh(rbox(5.4, 1, 1.2, 0.25), toy(0xffffff), 0, 3.5, 0, g);
-        const c = Math.cos(g.rotation.y), s = Math.sin(g.rotation.y);
-        obstacles.push({ x: x - 2 * c, z: z + 2 * s, r: 0.9 }, { x: x + 2 * c, z: z - 2 * s, r: 0.9 });
+        const c = Math.cos(g.rotation.y), sn = Math.sin(g.rotation.y);
+        obstacles.push({ x: x - 2 * c, z: z + 2 * sn, r: 0.9 }, { x: x + 2 * c, z: z - 2 * sn, r: 0.9 });
       }
-    });
+    }
+    // lollipop trees in little groves
+    const trunk = toy(0xb07a4a), leaves = [toy(0x4fd18b), toy(0x3aa655), toy(0x9be22d)];
+    for (let g = 0; g < 12; g++) {
+      const spot = freeSpot(30, WORLD - 10, 10); if (!spot) continue;
+      for (let i = 0; i < 5; i++) {
+        const x = spot[0] + rand(-6, 6), z = spot[1] + rand(-6, 6);
+        if (obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 1.5)) continue;
+        const h = rand(2, 3.5), r = rand(1.1, 1.8);
+        mesh(new THREE.CylinderGeometry(0.22, 0.28, h, 8), trunk, x, h / 2, z, scene);
+        mesh(new THREE.IcosahedronGeometry(r, 1), pick(leaves), x, h + r * 0.7, z, scene);
+        obstacles.push({ x, z, r: 0.5 });
+      }
+    }
   })();
 
   /* ================= ZONE VISUALS ================= */
@@ -495,9 +521,10 @@
     const word = (w, z) => { let x = -((w.length - 1) * 3.1) / 2; [...w].forEach((ch, i) => { addProp("letter", x + i * 3.1, z, { ch, color: LETTER_COLORS[i % LETTER_COLORS.length], h: 0 }); }); };
     word("SCRAP", -4); word("ROYALE", 4);
     const pinSet = (cx, cz) => { let k = 0; for (let row = 0; row < 4; row++) for (let i = 0; i <= row; i++) { addProp("pin", cx + row * 0.75, cz + (i - row / 2) * 0.75); k++; } };
-    pinSet(-15, 10); pinSet(14, -9); pinSet(9, 22);
-    for (let i = 0; i < 16; i++) { const a = rand(0, 6.28), d = rand(10, 36); addProp("cone", Math.cos(a) * d, Math.sin(a) * d); }
-    for (let i = 0; i < 12; i++) { const a = rand(0, 6.28), d = rand(12, 36); addProp("crate", Math.cos(a) * d, Math.sin(a) * d); }
+    pinSet(-15, 10); pinSet(14, -9);
+    for (let i = 0; i < 7; i++) { const sp = freeSpot(30, WORLD - 10, 4); if (sp) pinSet(sp[0], sp[1]); }
+    for (let i = 0; i < 45; i++) { const sp = freeSpot(10, WORLD - 5, 1.5); if (sp) addProp("cone", sp[0], sp[1]); }
+    for (let i = 0; i < 30; i++) { const sp = freeSpot(12, WORLD - 5, 1.5); if (sp) addProp("crate", sp[0], sp[1]); }
   })();
   function resetProps() {
     for (const p of props) {
@@ -526,8 +553,10 @@
         if (d < m && d > 0.001) { const nx = dx / d, nz = dz / d; p.x = o.x + nx * m; p.z = o.z + nz * m; const vn = p.vx * nx + p.vz * nz; if (vn < 0) { p.vx -= 1.6 * vn * nx; p.vz -= 1.6 * vn * nz; } }
       }
     }
+    for (const p of props) p.moving = Math.abs(p.vx) + Math.abs(p.vz) > 0.05 || p.y > 0 || (p.falling && p.fall < 1);
     for (let i = 0; i < props.length; i++) for (let j = i + 1; j < props.length; j++) {
       const a = props[i], b = props[j];
+      if (!a.moving && !b.moving) continue;
       const dx = b.x - a.x, dz = b.z - a.z, m = a.r + b.r;
       if (Math.abs(dx) > m || Math.abs(dz) > m) continue;
       const d = Math.hypot(dx, dz);
@@ -582,10 +611,10 @@
     cannon:  { name: "Cannon",       dmg: 7,  range: 12,  cd: 1.5, knock: 0.5, ranged: true },
   };
   const LOCO = {
-    wheels4: { name: "4 wheels", speed: 7.6, hp: 0 },
-    wheels6: { name: "6 wheels", speed: 8.1, hp: 10 },
-    treads:  { name: "Treads", speed: 6.3, hp: 25 },
-    hover:   { name: "Hover pads", speed: 9.6, hp: -5 },
+    wheels4: { name: "4 wheels", speed: 11.5, hp: 0 },
+    wheels6: { name: "6 wheels", speed: 12.3, hp: 10 },
+    treads:  { name: "Treads", speed: 9.5, hp: 25 },
+    hover:   { name: "Hover pads", speed: 14.4, hp: -5 },
   };
   const CHASSIS = { box: "Box", wedge: "Wedge", dome: "Dome", tank: "Tank" };
   const CH = { box: { fx: 1.1, top: 0.8 }, wedge: { fx: 1.3, top: 0.95 }, dome: { fx: 1.05, top: 1.15 }, tank: { fx: 1.2, top: 1.35 } };
@@ -594,7 +623,7 @@
     const w = WEAPONS[spec.weapon], l = LOCO[spec.loco], mult = 1 + 0.3 * (spec.wlvl - 1);
     return {
       maxHp: Math.round(100 + (spec.size - 1) * 35 + spec.armor * 25 + l.hp * 1.5 + (spec.chassis === "tank" ? 20 : 0)),
-      speed: Math.max(4, l.speed - (spec.size - 1) * 0.7 - spec.armor * 0.35),
+      speed: Math.max(6, l.speed - (spec.size - 1) * 1.0 - spec.armor * 0.5),
       dmg: Math.round(w.dmg * mult * 0.5 * 10) / 10,
       range: w.range * (spec.weapon === "cannon" ? 1 : 0.9 + 0.1 * sizeScale(spec.size) + 0.05 * spec.wlvl),
       cd: w.cd, knock: w.knock, flip: !!w.flip, ranged: !!w.ranged,
@@ -740,8 +769,8 @@
   function makeLabel() {
     const c = document.createElement("canvas"); c.width = 256; c.height = 64;
     const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-    sp.scale.set(3.2, 0.8, 1); sp.renderOrder = 10;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
+    sp.scale.set(0.085, 0.021, 1); sp.renderOrder = 10;
     return { sp, c, tex };
   }
   function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -796,7 +825,7 @@
   let lastWinnerWeapon = null;
 
   /* ================= ROUND STATE ================= */
-  let S = null, round = 0, selected = null, following = false;
+  let S = null, round = 0, selected = null, following = false, camMode = "action", focusBot = null, focusSince = 0;
 
   function startLobby() {
     if (S) {
@@ -811,7 +840,7 @@
     S = {
       phase: "lobby", t: 0, fightT: 0, bots: [], items: [], shots: [], queue: roster, joinT: 0.4, countT: 0, resT: 0,
       crateT: 8, scrapT: 6, lastThinker: null, winner: null, placements: [],
-      zone: { cx: 0, cz: 0, r: 38, phase: "wait", t: 12, n: 0, fromR: 38, toR: 38, fromX: 0, fromZ: 0, toX: 0, toZ: 0, dur: 7 },
+      zone: { cx: 0, cz: 0, r: WORLD - 4, phase: "wait", t: 18, n: 0, fromR: WORLD - 4, toR: WORLD - 4, fromX: 0, fromZ: 0, toX: 0, toZ: 0, dur: 7 },
     };
     setZoneVisible(false);
     ui.results.hidden = true;
@@ -868,7 +897,7 @@
   const scrapMat = toy(0xffd166, 0.35, 0.4, { emissive: 0x8a5a00, emissiveIntensity: 0.35 });
   function spawnScrap(x, z, value) {
     for (let t = 0; t < 20 && x == null; t++) {
-      const a = rand(0, Math.PI * 2), d = Math.sqrt(Math.random()) * 37;
+      const a = rand(0, Math.PI * 2), d = Math.sqrt(Math.random()) * (WORLD - 5);
       const px = Math.cos(a) * d, pz = Math.sin(a) * d;
       if (!obstacles.some((o) => Math.hypot(o.x - px, o.z - pz) < o.r + 1)) { x = px; z = pz; }
     }
@@ -895,16 +924,16 @@
     // The last circle closes completely, so every round has an ending.
     Z.toR = Z.r > 8 ? Math.max(6, Z.r * 0.6) : Z.r > 3 ? Math.max(2.5, Z.r * 0.5) : 0;
     const slack = Z.r - Z.toR, a = rand(0, Math.PI * 2), d = rand(0, slack * 0.8);
-    Z.toX = clamp(Z.cx + Math.cos(a) * d, -28, 28); Z.toZ = clamp(Z.cz + Math.sin(a) * d, -28, 28);
+    Z.toX = clamp(Z.cx + Math.cos(a) * d, -WORLD * 0.6, WORLD * 0.6); Z.toZ = clamp(Z.cz + Math.sin(a) * d, -WORLD * 0.6, WORLD * 0.6);
   }
   function updateZone(dt) {
     const Z = S.zone;
     Z.t -= dt;
-    if (Z.phase === "wait" && Z.t <= 0) { Z.phase = "shrink"; Z.t = Z.dur = 7; feed(null, "The zone is closing in.", "zone"); }
+    if (Z.phase === "wait" && Z.t <= 0) { Z.phase = "shrink"; Z.t = Z.dur = 12; feed(null, "The zone is closing in.", "zone"); }
     else if (Z.phase === "shrink") {
       const p = 1 - clamp(Z.t / Z.dur, 0, 1), e = p * p * (3 - 2 * p);
       Z.r = Z.fromR + (Z.toR - Z.fromR) * e; Z.cx = Z.fromX + (Z.toX - Z.fromX) * e; Z.cz = Z.fromZ + (Z.toZ - Z.fromZ) * e;
-      if (Z.t <= 0) { Z.phase = "wait"; Z.n++; Z.t = Math.max(5, 10 - Z.n * 1.5); planZone(); }
+      if (Z.t <= 0) { Z.phase = "wait"; Z.n++; Z.t = Math.max(7, 15 - Z.n * 1.5); planZone(); }
     }
     drawZone();
   }
@@ -982,15 +1011,15 @@
     if (margin < 3 || (S.zone.phase === "wait" && S.zone.t < 5 && nextMargin < 2)) {
       goal = { type: "zone" };
       text = margin < 0 ? `I'm outside the zone, losing ${zoneDmg().toFixed(0)} HP a second. Getting back in.` : nextMargin >= 0 ? `Right at the edge of the next circle. Moving ${compass(zc.x - b.x, zc.z - b.z)}, deeper inside.` : `Next circle is ${Math.round(-nextMargin)}m away. Moving ${compass(zc.x - b.x, zc.z - b.z)} before it closes.`;
-    } else if (near && near.d < 12 && pct(b) < b.caution * 100 && power(near.o) > power(b) * 0.7) {
+    } else if (near && near.d < 16 && pct(b) < b.caution * 100 && power(near.o) > power(b) * 0.7) {
       goal = { type: "flee", from: near.o };
       text = `I'm at ${pct(b)}% and ${near.o.name} has a ${WEAPONS[near.o.spec.weapon].name.toLowerCase()}. Backing off.`;
-    } else if (b.scrap >= cost(b) && (!near || near.d > 10) && Math.random() < 0.6 + b.build * 0.4) {
+    } else if (b.scrap >= cost(b) && (!near || near.d > 14) && Math.random() < 0.6 + b.build * 0.4) {
       const up = chooseUpgrade(b);
       goal = { type: "build" }; b.pendingUpgrade = up; b.building = 1.6;
       text = `${b.scrap} scrap, enough for an upgrade. ${up.reason}`;
     } else {
-      const range = b.mode === "biggest" || b.spec.weapon === "cannon" ? 28 : 22;
+      const range = b.mode === "biggest" || b.spec.weapon === "cannon" ? 45 : 36;
       const cands = enemies.filter((e) => e.d < range && !outside(e.o.x, e.o.z, -2));
       let tgt = null, why = "";
       if (b.mode === "random") { if (cands.length && Math.random() < 0.6) { tgt = pick(cands).o; why = `Flipped a coin. ${tgt.name} it is.`; } }
@@ -1008,7 +1037,7 @@
       if (!tgt && cands.length && b.mode !== "opportunist" && b.mode !== "weakest") {
         const e = cands[0];
         const brave = power(b) * (0.55 + b.aggr) > power(e.o) * 0.9 || b.aggr > 0.85;
-        if (brave && e.d < 16 && b.spec.weapon !== "none") { tgt = e.o; why = `${tgt.name} is ${Math.round(e.d)}m away and I think I can take it. Engaging.`; }
+        if (brave && e.d < 26 && b.spec.weapon !== "none") { tgt = e.o; why = `${tgt.name} is ${Math.round(e.d)}m away and I think I can take it. Engaging.`; }
       }
       if (tgt && b.spec.weapon === "none" && b.mode !== "random" && pct(tgt) > 30) tgt = null;
       if (tgt && early && b.mode !== "revenge") tgt = null;
@@ -1022,7 +1051,7 @@
           if (it.kind === "crate" && !it.landed) continue;
           if (outside(it.x, it.z, 1.5)) continue;
           const d = Math.hypot(it.x - b.x, it.z - b.z);
-          if (d > 16 + b.greed * 22) continue;
+          if (d > 28 + b.greed * 40) continue;
           const danger = enemies.some((e) => Math.hypot(e.o.x - it.x, e.o.z - it.z) < 5 && power(e.o) > power(b)) ? 0.4 : 1;
           const sc = (it.value * (it.kind === "crate" ? (b.crates ? 4 : 1.6) : 1) * danger) / (d + 5);
           if (sc > bestS) { bestS = sc; best = it; }
@@ -1033,7 +1062,8 @@
           text = best.kind === "crate" ? `Supply crate ${d}m ${compass(best.x - b.x, best.z - b.z)}. Scrap and repairs. Going for it.`
             : need > 0 ? `${b.scrap} scrap, need ${need} more for the next upgrade. Scrap ${d}m ${compass(best.x - b.x, best.z - b.z)}.` : `Grabbing scrap ${d}m ${compass(best.x - b.x, best.z - b.z)} while it's quiet.`;
         } else {
-          goal = { type: "point", x: zc.x + rand(-zc.r, zc.r) * 0.5, z: zc.z + rand(-zc.r, zc.r) * 0.5 };
+          const wa = rand(0, Math.PI * 2), wd = Math.sqrt(Math.random()) * zc.r * 0.85;
+          goal = { type: "point", x: zc.x + Math.cos(wa) * wd, z: zc.z + Math.sin(wa) * wd };
           text = "Nothing useful nearby. Scouting toward the safe zone.";
         }
       }
@@ -1065,7 +1095,7 @@
     b.dmgSinceBuild = 0; b.escapes = 0; b.flipped = 0;
     mountMesh(b);
     b.history.push({ gen: b.gen, reason: up.reason, img: thumb(b.spec, b.color) });
-    b.bump = 1;
+    b.bump = 1; b.heat = (b.heat || 0) + 3;
     spark(b.x, 1.5, b.z, 40, [0xffffff, 0x7fe8ff, 0xffd166], 6); puff(b.x, 0.3, b.z, 6, 0xfde2c4, 1.2, 1.4);
     feed(b, `evolved to <b>v${b.gen}</b>: ${esc(describe(b.spec))}`, "evo");
     b.goal = { type: "idle" }; b.thinkT = 0.3;
@@ -1074,6 +1104,7 @@
   function dealDamage(att, tgt, dmg, st) {
     if (!tgt.alive) return;
     tgt.hp -= dmg; tgt.dmgSinceBuild += dmg; tgt.lastHitBy = att; tgt.lastHitAt = S.t;
+    att.heat = (att.heat || 0) + dmg * 0.5 + 2; tgt.heat = (tgt.heat || 0) + dmg * 0.5 + 2;
     att.dmgDealt += dmg;
     const dx = tgt.x - att.x, dz = tgt.z - att.z, d = Math.hypot(dx, dz) || 1;
     tgt.x += (dx / d) * st.knock; tgt.z += (dz / d) * st.knock;
@@ -1145,12 +1176,13 @@
       if (b.hop) {
         const H = b.hop; H.t += dt;
         const p = clamp(H.t / H.dur, 0, 1);
-        b.x = H.fx + (H.tx - H.fx) * p; b.z = H.fz + (H.tz - H.fz) * p; b.y = Math.sin(p * Math.PI) * 9;
+        b.x = H.fx + (H.tx - H.fx) * p; b.z = H.fz + (H.tz - H.fz) * p; b.y = Math.sin(p * Math.PI) * 24;
         b.h = Math.atan2(-(H.tz - H.fz), H.tx - H.fx);
         if (p >= 1) { b.hop = null; b.y = 0; b.bump = 1.4; puff(b.x, 0.2, b.z, 6, 0xfde2c4, 1.2, 1.2); }
         continue;
       }
       b.cd -= dt; b.stun -= dt; b.thinkT -= dt;
+      b.heat = (b.heat || 0) * Math.exp(-dt / 3);
       if (b.air > 0) b.air -= dt;
       let moved = 0;
       if (!fighting) {
@@ -1160,7 +1192,7 @@
       } else {
         const g = b.goal;
         if (g.type === "hunt" && !g.target.alive) b.thinkT = Math.min(b.thinkT, 0.2);
-        if (g.type === "hunt" && g.target.alive && dist(b, g.target) > 30) { b.escapes++; b.thinkT = 0; }
+        if (g.type === "hunt" && g.target.alive && dist(b, g.target) > 55) { b.escapes++; b.thinkT = 0; }
         if (g.type === "item" && !S.items.includes(g.item)) b.thinkT = Math.min(b.thinkT, 0.2);
         if (g.type === "flee" && !g.from.alive) b.thinkT = Math.min(b.thinkT, 0.2);
         if (b.building > 0) {
@@ -1263,7 +1295,7 @@
       if (S.countT <= 0) {
         S.phase = "fight"; S.fightT = 0;
         planZone(); setZoneVisible(true); drawZone();
-        for (let i = 0; i < 80; i++) spawnScrap(null, null, 1);
+        for (let i = 0; i < 300; i++) spawnScrap(null, null, 1);
         feed(null, `GO! ${S.bots.length} bots, one winner.`, "zone");
         S.bots.forEach((b) => { b.thinkT = rand(0, 0.8); b.goal = { type: "idle" }; });
       }
@@ -1278,7 +1310,7 @@
         feed(null, `A supply crate is dropping ${compass(Math.cos(a), Math.sin(a))} of the zone center.`, "drop");
       }
       S.scrapT -= dt;
-      if (S.scrapT <= 0) { S.scrapT = 6; for (let i = 0; i < 3; i++) { const a = rand(0, Math.PI * 2), d = rand(0, S.zone.r * 0.85); spawnScrap(S.zone.cx + Math.cos(a) * d, S.zone.cz + Math.sin(a) * d, 1); } }
+      if (S.scrapT <= 0) { S.scrapT = 5; for (let i = 0; i < 8; i++) { const a = rand(0, Math.PI * 2), d = rand(0, S.zone.r * 0.85); spawnScrap(S.zone.cx + Math.cos(a) * d, S.zone.cz + Math.sin(a) * d, 1); } }
     } else if (S.phase === "results") {
       S.resT -= dt;
       if (S.winner && S.winner.alive && Math.random() < dt * 3) spark(S.winner.x, 3, S.winner.z, 20, [0xff5a36, 0xffd166, 0x6ec6ff, 0x4fd18b, 0xff7eb6, 0x9b7bff], 9, 9);
@@ -1306,9 +1338,9 @@
     const n = S.bots.length, off = rand(0, Math.PI * 2);
     S.bots.forEach((b, i) => {
       const a = off + (i / n) * Math.PI * 2;
-      let tx = Math.cos(a) * 30, tz = Math.sin(a) * 30;
+      const ring = WORLD * rand(0.45, 0.8); let tx = Math.cos(a) * ring, tz = Math.sin(a) * ring;
       for (const o of obstacles) { const d = Math.hypot(tx - o.x, tz - o.z); if (d < o.r + 2) { tx *= 0.85; tz *= 0.85; } }
-      b.hop = { fx: b.x, fz: b.z, tx, tz, t: -i * 0.06, dur: 1.3 };
+      b.hop = { fx: b.x, fz: b.z, tx, tz, t: -i * 0.06, dur: 2.0 };
     });
   }
 
@@ -1415,6 +1447,20 @@
   function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   new ResizeObserver(resize).observe(stage); resize();
 
+  // Action cam: cut to whoever is in the thick of it, hold each shot for a few seconds.
+  function pickFocus() {
+    const live = S.bots.filter((b) => b.alive && b.landed && !b.hop);
+    if (!live.length) return null;
+    let best = live[0];
+    for (const b of live) if ((b.heat || 0) > (best.heat || 0)) best = b;
+    const cur = focusBot && focusBot.alive && S.bots.includes(focusBot) ? focusBot : null;
+    const held = S.t - focusSince;
+    if (!cur) { focusBot = (best.heat || 0) > 0.5 ? best : (S.lastThinker && S.lastThinker.alive ? S.lastThinker : best); focusSince = S.t; }
+    else if (held > 3 && best !== cur && (best.heat || 0) > (cur.heat || 0) * 1.5 + 2) { focusBot = best; focusSince = S.t; }
+    else if (held > 8 && (cur.heat || 0) < 1) { focusBot = (best.heat || 0) > 1 ? best : pick(live); focusSince = S.t; }
+    return focusBot;
+  }
+  let shadowExt = 34;
   function placeCamera(dt, now) {
     const k = Math.min(1, dt * 2.5);
     const sel = selected !== null ? S.bots[selected] : null;
@@ -1425,23 +1471,33 @@
       px = sel.x - Math.cos(a) * d; pz = sel.z + Math.sin(a) * d; py = hgt + sel.y * 0.5;
       cam.tx += (sel.x - cam.tx) * k * 1.6; cam.tz += (sel.z - cam.tz) * k * 1.6;
       lx = cam.tx; lz = cam.tz;
+      cam.radius = Math.hypot(d, hgt);
     } else {
       if (!cam.dragging && !reduced && now - cam.lastInput > 3000) cam.theta += dt * 0.05;
-      // director: frame the living bots (or the lobby)
-      const live = S.bots.filter((b) => b.alive && b.landed);
-      let cx = 0, cz = 0, spread = 18;
-      if (live.length && S.phase === "fight") {
-        live.forEach((b) => { cx += b.x; cz += b.z; }); cx /= live.length; cz /= live.length;
-        spread = Math.max(10, ...live.map((b) => Math.hypot(b.x - cx, b.z - cz)));
-        cx = cx * 0.7 + S.zone.cx * 0.3; cz = cz * 0.7 + S.zone.cz * 0.3;
-      } else if (S.phase === "results" && S.winner) { cx = S.winner.x; cz = S.winner.z; spread = 8; }
-      else spread = S.phase === "countdown" ? 30 : 20;
-      cam.tx += (cx - cam.tx) * k * 0.6; cam.tz += (cz - cam.tz) * k * 0.6;
-      const want = clamp(spread * 2.2 + 26, 36, 110) * (camera.aspect < 1 ? 1.5 : 1);
-      cam.radius += (want - cam.radius) * k * 0.5;
+      let cx = 0, cz = 0, want = 60;
+      if (S.phase === "lobby") { want = 62; }
+      else if (S.phase === "countdown") { want = WORLD * 2.1; }
+      else if (S.phase === "results" && S.winner) { cx = S.winner.x; cz = S.winner.z; want = 34; }
+      else if (camMode === "overview") { cx = S.zone.cx; cz = S.zone.cz; want = clamp(S.zone.r * 2.3 + 30, 50, WORLD * 2.6); }
+      else {
+        const f = pickFocus();
+        if (f) {
+          cx = f.x; cz = f.z;
+          const near = S.bots.filter((b) => b.alive && b !== f && dist(b, f) < 22);
+          const spread = near.length ? Math.max(...near.map((b) => dist(b, f))) : 0;
+          if (near.length) { near.forEach((b) => { cx += b.x; cz += b.z; }); cx /= near.length + 1; cz /= near.length + 1; }
+          want = clamp(38 + spread * 1.8, 38, 90);
+        }
+      }
+      if (camera.aspect < 1) want *= 1.45;
+      const cut = Math.hypot(cx - cam.tx, cz - cam.tz) > 60 && S.phase === "fight";
+      const kk = cut ? 1 : k * 0.8;
+      cam.tx += (cx - cam.tx) * kk; cam.tz += (cz - cam.tz) * kk;
+      cam.radius += (want - cam.radius) * k * 0.6;
       const r = cam.radius;
       px = cam.tx + r * Math.sin(cam.phi) * Math.sin(cam.theta); py = r * Math.cos(cam.phi); pz = cam.tz + r * Math.sin(cam.phi) * Math.cos(cam.theta);
       lx = cam.tx; lz = cam.tz;
+      if (cut) { camera.position.set(px, py, pz); }
     }
     camera.position.x += (px - camera.position.x) * k; camera.position.y += (py - camera.position.y) * k; camera.position.z += (pz - camera.position.z) * k;
     if (shake > 0 && !reduced) { camera.position.x += rand(-1, 1) * shake; camera.position.y += rand(-1, 1) * shake; }
@@ -1449,15 +1505,53 @@
     camera.lookAt(lx, 0.5, lz);
     // Fog starts well past the arena, however far out the camera is.
     const camDist = Math.hypot(camera.position.x - lx, camera.position.y, camera.position.z - lz);
-    scene.fog.near = camDist + 45; scene.fog.far = camDist + 200;
-    sun.position.set(cam.tx - 20, 45, cam.tz + 25); sun.target.position.set(cam.tx, 0, cam.tz);
+    scene.fog.near = camDist + 45; scene.fog.far = camDist + 220;
+    // Shadows cover what the camera can see.
+    const ext = clamp(camDist * 0.75, 30, 200);
+    if (Math.abs(ext - shadowExt) / shadowExt > 0.08) {
+      shadowExt = ext;
+      Object.assign(sun.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, far: 120 + ext });
+      sun.shadow.camera.updateProjectionMatrix();
+    }
+    sun.position.set(cam.tx - 20, 60, cam.tz + 30); sun.target.position.set(cam.tx, 0, cam.tz);
+  }
+
+  // Minimap: whole world, zone, crates and every bot.
+  const mm = document.getElementById("minimap"), mctx = mm.getContext("2d");
+  function drawMinimap() {
+    const W = mm.width, c = W / 2, sc = (W / 2 - 6) / WORLD, g = mctx;
+    g.clearRect(0, 0, W, W);
+    g.save();
+    g.beginPath(); g.arc(c, c, W / 2 - 2, 0, 7); g.fillStyle = "#fff3e6"; g.fill(); g.clip();
+    g.beginPath(); g.arc(c, c, WORLD * sc, 0, 7); g.fillStyle = "#f3a462"; g.fill();
+    if (S.phase === "fight" || S.phase === "results") {
+      const Z = S.zone;
+      const zx = c + Z.cx * sc, zy = c + Z.cz * sc, zr = Math.max(0, Z.r * sc);
+      g.beginPath(); g.arc(c, c, WORLD * sc + 4, 0, Math.PI * 2);
+      g.moveTo(zx + zr, zy); g.arc(zx, zy, zr, 0, Math.PI * 2, true);
+      g.fillStyle = "rgba(90,43,184,0.45)"; g.fill("evenodd");
+      if (Z.phase === "wait") { g.beginPath(); g.arc(c + Z.toX * sc, c + Z.toZ * sc, Z.toR * sc, 0, 7); g.strokeStyle = "#fff"; g.lineWidth = 3; g.setLineDash([8, 6]); g.stroke(); g.setLineDash([]); }
+    }
+    g.fillStyle = "#ff5a36";
+    for (const it of S.items) if (it.kind === "crate") g.fillRect(c + it.x * sc - 5, c + it.z * sc - 5, 10, 10);
+    const sel = selected !== null ? S.bots[selected] : null;
+    for (const b of S.bots) {
+      if (!b.landed && !b.alive) continue;
+      const x = c + b.x * sc, y = c + b.z * sc;
+      if (!b.alive) { g.strokeStyle = "rgba(43,29,22,0.5)"; g.lineWidth = 3; g.beginPath(); g.moveTo(x - 5, y - 5); g.lineTo(x + 5, y + 5); g.moveTo(x + 5, y - 5); g.lineTo(x - 5, y + 5); g.stroke(); continue; }
+      g.beginPath(); g.arc(x, y, b === sel ? 10 : 7, 0, 7); g.fillStyle = hexStr(b.color); g.fill();
+      g.lineWidth = b === sel ? 4 : 2.5; g.strokeStyle = "#fff"; g.stroke();
+    }
+    // camera view marker
+    g.beginPath(); g.arc(c + cam.tx * sc, c + cam.tz * sc, Math.max(8, cam.radius * 0.35 * sc), 0, 7); g.strokeStyle = "rgba(43,29,22,0.55)"; g.lineWidth = 2; g.stroke();
+    g.restore();
   }
 
   /* ================= UI ================= */
   const ui = {
     feed: $("feed"), killfeed: $("killfeed"), standings: $("standings"), bubble: $("bubble"), results: $("results"),
     alive: $("alive"), zoneLine: $("zoneLine"), phaseLabel: $("phaseLabel"), sponsorBtn: $("sponsorBtn"), sponsorName: $("sponsorName"), sponsorText: $("sponsorText"),
-    overviewBtn: $("overviewBtn"), centerBig: $("centerBig"), centerLine: $("centerLine"), seasonWrap: $("seasonWrap"), seasonBody: $("seasonBody"),
+    overviewBtn: $("overviewBtn"), actionBtn: $("actionBtn"), centerBig: $("centerBig"), centerLine: $("centerLine"), seasonWrap: $("seasonWrap"), seasonBody: $("seasonBody"),
   };
   const fmtT = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   function feed(b, html, kind) {
@@ -1552,8 +1646,13 @@
   }
 
   function select(id, follow) { selected = id; if (follow) setFollow(true); renderCard(true); renderStandings(false); }
-  function setFollow(on) { following = on; cam.followYaw = 0; ui.overviewBtn.setAttribute("aria-pressed", String(!on)); }
-  ui.overviewBtn.addEventListener("click", () => setFollow(false));
+  function setFollow(on) {
+    following = on; cam.followYaw = 0;
+    ui.overviewBtn.setAttribute("aria-pressed", String(!on && camMode === "overview"));
+    ui.actionBtn.setAttribute("aria-pressed", String(!on && camMode === "action"));
+  }
+  ui.overviewBtn.addEventListener("click", () => { camMode = "overview"; setFollow(false); });
+  ui.actionBtn.addEventListener("click", () => { camMode = "action"; focusBot = null; setFollow(false); });
 
   let speed = location.hash === "#turbo" ? 12 : 1;
   document.querySelectorAll("[data-speed]").forEach((btn) => btn.addEventListener("click", () => {
@@ -1574,7 +1673,8 @@
   $("nextRound").addEventListener("click", () => startLobby());
 
   function updateBubble() {
-    const b = following && selected !== null ? S.bots[selected] : S.lastThinker;
+    let b = following && selected !== null ? S.bots[selected] : S.lastThinker;
+    if (!following && camMode === "action" && S.phase === "fight" && focusBot && focusBot.alive && S.t - focusBot.thoughtAt < 4) b = focusBot;
     if (!b || !b.alive || !b.landed || S.t - b.thoughtAt > 4 || !b.thought) { ui.bubble.hidden = true; return; }
     const v = new THREE.Vector3(b.x, b.y + 4 * sizeScale(b.spec.size) + 0.8, b.z).project(camera);
     if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) { ui.bubble.hidden = true; return; }
@@ -1630,7 +1730,7 @@
     placeCamera(rdt, now);
     renderer.render(scene, camera);
     updateBubble();
-    hudT -= rdt; if (hudT <= 0) { hudT = 0.1; updateHud(); }
+    hudT -= rdt; if (hudT <= 0) { hudT = 0.1; updateHud(); drawMinimap(); }
     uiT -= rdt; if (uiT <= 0) { uiT = 0.25; renderStandings(false); renderCard(false); }
     requestAnimationFrame(frame);
   }
