@@ -1,0 +1,1131 @@
+<title>Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Same sunny toy-box world as Scrap Royale, set up as a workshop. */
+  :root {
+    color-scheme: light;
+    --bg: #fff3e6;
+    --panel: #ffffff;
+    --panel-2: #fde6d2;
+    --line: rgba(60, 30, 15, 0.10);
+    --line-strong: rgba(60, 30, 15, 0.22);
+    --ink: #2b1d16;
+    --ink-soft: #8a6a58;
+    --signal: #ff5a36;
+    --gold: #ffb703;
+    --violet: #7b3fe4;
+    --good: #22a867;
+    --bad: #e2402c;
+    --display: "Lilita One", "Arial Rounded MT Bold", "Arial Black", sans-serif;
+    --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 14px 40px; display: flex; flex-direction: column; gap: 14px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 20px; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: clamp(30px, 5.5vw, 46px); line-height: 1; margin: 0; }
+  h1 span { color: var(--violet); }
+  .sub { margin: 0; color: var(--ink-soft); max-width: 66ch; font-weight: 700; }
+  h2 { font-family: var(--mono); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-soft); margin: 0; }
+  h3 { font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1.05; margin: 0; }
+
+  .top { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  .card { background: var(--panel); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; box-shadow: 0 4px 0 rgba(120, 60, 20, 0.08); }
+
+  /* Stage */
+  .stage { position: relative; min-height: 420px; height: 100%; border-radius: 18px; overflow: hidden; background: #f3a462; box-shadow: 0 10px 0 rgba(120, 60, 20, 0.12); }
+  .stage canvas { display: block; width: 100%; height: 100%; position: absolute; inset: 0; touch-action: pan-y; cursor: grab; }
+  .hud { position: absolute; left: 14px; right: 14px; top: 14px; display: flex; justify-content: space-between; gap: 10px; pointer-events: none; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; background: #fff; color: var(--ink); padding: 5px 11px; border-radius: 999px; box-shadow: 0 3px 0 rgba(0,0,0,0.12); }
+  .fightbar { position: absolute; left: 14px; right: 14px; top: 14px; display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: start; pointer-events: none; }
+  .fb-side { background: #fff; border-radius: 14px; padding: 6px 10px; box-shadow: 0 3px 0 rgba(0,0,0,0.12); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .fb-side.right { text-align: right; }
+  .fb-name { font-family: var(--display); font-size: 18px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fb-bar { height: 8px; background: #f1dcc8; border-radius: 4px; overflow: hidden; }
+  .fb-bar div { height: 100%; background: var(--good); transition: width .2s; }
+  .right .fb-bar { transform: scaleX(-1); }
+  .fb-time { font-family: var(--display); font-size: 26px; color: #fff; text-shadow: 0 3px 0 rgba(120,50,10,0.35); padding-top: 4px; }
+  .ticker { position: absolute; left: 14px; bottom: 60px; display: flex; flex-direction: column-reverse; gap: 5px; pointer-events: none; max-width: min(70%, 420px); }
+  .tick { font-family: var(--mono); font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.95); padding: 4px 10px; border-radius: 999px; box-shadow: 0 2px 0 rgba(0,0,0,0.1); animation: pop .3s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0; } }
+  .stage-ctl { position: absolute; left: 14px; right: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ctl { font: 700 12px var(--mono); letter-spacing: 0.05em; color: var(--ink); background: #fff; border: 0; border-radius: 999px; padding: 8px 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.14); }
+  .ctl[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .ctl:focus-visible, .btn:focus-visible, .chip:focus-visible, .ver:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+  .ctl:disabled { opacity: 0.5; cursor: default; }
+  .banner { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); font-family: var(--display); font-size: clamp(34px, 7vw, 72px); color: #fff; text-shadow: 0 5px 0 rgba(120,50,10,0.35); pointer-events: none; text-align: center; line-height: 1; }
+  .nogl { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: #fff; font-weight: 800; }
+
+  /* Agent card */
+  label.lbl { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+  input[type="text"], textarea {
+    width: 100%; box-sizing: border-box; font: 700 15px var(--body); color: var(--ink);
+    background: var(--panel-2); border: 2px solid transparent; border-radius: 10px; padding: 8px 10px;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--violet); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: 700 12px var(--body); border: 0; background: #efe6ff; color: #4b2a94; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+  .chip:hover { background: #e2d3ff; }
+  .btnrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .btn { font-family: var(--display); font-size: 18px; background: var(--violet); color: #fff; border: 0; border-radius: 999px; padding: 9px 18px; cursor: pointer; box-shadow: 0 4px 0 #4f22a3; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #4f22a3; }
+  .btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+  .btn.ghost { background: #fff; color: var(--ink); box-shadow: 0 4px 0 rgba(0,0,0,0.15); border: 2px solid var(--line-strong); }
+  .mode { font-size: 13px; font-weight: 700; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); }
+  .mode.claude { background: #efe6ff; color: #3d1f80; }
+  .status { font-size: 14px; font-weight: 700; min-height: 1.4em; }
+  .status.err { color: var(--bad); }
+  pre.stream { margin: 0; max-height: 140px; overflow: auto; font: 500 11px/1.4 var(--mono); background: #2b1d16; color: #fde6d2; padding: 8px 10px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .budget { display: flex; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12px; font-weight: 700; }
+  .budget .bar { flex: 1; height: 10px; background: var(--panel-2); border-radius: 5px; overflow: hidden; }
+  .budget .bar div { height: 100%; background: var(--gold); }
+
+  /* Design card */
+  .idea { margin: 0; font-weight: 800; font-size: 16px; }
+  .reason { margin: 0; padding: 10px 12px; background: #efe6ff; border-radius: 10px; font-size: 14px; }
+  .reason b { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #6b4bb3; margin-bottom: 2px; }
+  dl.stats { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stats div { background: var(--panel-2); border-radius: 10px; padding: 6px 8px; }
+  .stats dt { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-soft); text-transform: uppercase; }
+  .stats dd { margin: 0; font-family: var(--mono); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .notes li { font-size: 13.5px; padding: 5px 9px; border-radius: 8px; background: var(--panel-2); }
+  .notes li.warn { background: #ffe9c2; }
+  .notes li.bad { background: #ffd9d2; }
+  .notes li.good { background: #d6f5e3; }
+  .parts { font: 500 12.5px/1.5 var(--mono); color: var(--ink); }
+  .parts span { display: inline-block; background: var(--panel-2); border-radius: 6px; padding: 1px 7px; margin: 0 4px 4px 0; }
+  details summary { cursor: pointer; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+  details pre { font: 500 11px/1.4 var(--mono); background: var(--panel-2); padding: 8px; border-radius: 8px; overflow: auto; max-height: 220px; margin: 6px 0 0; }
+
+  /* Tests */
+  .tests { display: flex; flex-direction: column; gap: 8px; }
+  .test { border-radius: 12px; background: var(--panel-2); padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: start; }
+  .test-h { font-weight: 800; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .res { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: #fff; }
+  .res.W { background: var(--good); } .res.L { background: var(--bad); } .res.D { background: var(--ink-soft); }
+  .test ul { grid-column: 1 / -1; margin: 0; padding-left: 18px; font-size: 13.5px; }
+  .test .ctl { box-shadow: none; background: #fff; }
+  .opps { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opp { display: flex; gap: 8px; align-items: center; font-size: 13px; background: var(--panel-2); border-radius: 10px; padding: 4px 10px 4px 4px; }
+  .opp img { width: 48px; height: 36px; border-radius: 6px; }
+
+  /* Timeline */
+  .timeline { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+  .ver { flex: none; width: 150px; text-align: left; font: inherit; color: inherit; background: var(--panel-2); border: 2px solid transparent; border-radius: 12px; padding: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+  .ver.sel { border-color: var(--violet); }
+  .ver img { width: 100%; aspect-ratio: 4 / 3; height: auto; border-radius: 8px; background: #fff; }
+  .ver b { font-family: var(--display); font-weight: 400; font-size: 16px; line-height: 1.1; }
+  .ver small { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+  .rec { display: flex; gap: 3px; }
+  .rec i { width: 14px; height: 14px; border-radius: 4px; font: 700 9px/14px var(--mono); color: #fff; text-align: center; font-style: normal; }
+  .rec i.W { background: var(--good); } .rec i.L { background: var(--bad); } .rec i.D { background: var(--ink-soft); }
+  .src { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
+  .note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+
+  @media (max-width: 980px) { .top, .grid2 { grid-template-columns: 1fr; } .stage { height: 60vh; } }
+  @media (max-width: 560px) { dl.stats { grid-template-columns: repeat(2, 1fr); } .fb-name { font-size: 14px; } }
+  @media (prefers-reduced-motion: reduce) { .tick { animation: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>DESIGN <span>LAB</span></h1>
+    <p class="sub">No part menu. An AI agent gets raw building blocks, a scrap budget and one instruction from you, designs a robot, tests it against three opponents, reads the damage report and redesigns.</p>
+  </header>
+
+  <div class="top">
+    <section class="stage" id="stage" aria-label="3D workshop">
+      <div class="hud" id="garageHud"><span class="pill" id="garageLabel">WORKSHOP</span></div>
+      <div class="fightbar" id="fightHud" hidden>
+        <div class="fb-side"><span class="fb-name" id="fbA"></span><div class="fb-bar"><div id="fbAhp"></div></div></div>
+        <span class="fb-time" id="fbT">30</span>
+        <div class="fb-side right"><span class="fb-name" id="fbB"></span><div class="fb-bar"><div id="fbBhp"></div></div></div>
+      </div>
+      <div class="banner" id="banner"></div>
+      <div class="ticker" id="ticker"></div>
+      <div class="stage-ctl">
+        <button class="ctl" id="viewGarage" type="button" aria-pressed="true">WORKSHOP</button>
+        <button class="ctl" id="replayBtn" type="button">REPLAY A TEST FIGHT</button>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Agent">
+      <h2>Your agent</h2>
+      <div>
+        <label class="lbl" for="agentName">Name</label>
+        <input type="text" id="agentName" value="NOVA-1" maxlength="20">
+      </div>
+      <div>
+        <label class="lbl" for="instr">Your one instruction</label>
+        <textarea id="instr" maxlength="240">Build something that can't be flipped.</textarea>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="budget"><span>BUDGET</span><div class="bar"><div id="budgetBar" style="width:0%"></div></div><span id="budgetTxt">60 scrap</span></div>
+      <div class="mode" id="modeLine">Checking whether Claude can design in this view…</div>
+      <div class="btnrow">
+        <button class="btn" id="designBtn" type="button">DESIGN V1</button>
+        <button class="btn ghost" id="stopBtn" type="button" hidden>STOP</button>
+        <button class="btn ghost" id="restartBtn" type="button">NEW AGENT</button>
+      </div>
+      <div class="status" id="status" role="status" aria-live="polite"></div>
+      <pre class="stream" id="stream" hidden></pre>
+      <p class="note">Each version: the agent designs → the game builds it and works out its speed, weight, power, balance and weapons from the parts → it fights three test robots → the report goes back to the agent for the next version.</p>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="card" aria-label="Current design">
+      <h2 id="dTitle">Design</h2>
+      <h3 id="dName"></h3>
+      <p class="idea" id="dIdea"></p>
+      <p class="reason" id="dReason"><b>Agent's reasoning</b><span id="dReasonTxt"></span></p>
+      <dl class="stats" id="dStats"></dl>
+      <h2>What the physics says</h2>
+      <ul class="notes" id="dNotes"></ul>
+      <h2>Parts</h2>
+      <div class="parts" id="dParts"></div>
+      <details><summary>Raw design (as the agent wrote it)</summary><pre id="dRaw"></pre></details>
+    </section>
+
+    <section class="card" aria-label="Test results">
+      <h2>Test fights</h2>
+      <div class="opps" id="opps"></div>
+      <div class="tests" id="tests"></div>
+      <details><summary>Report sent back to the agent</summary><pre id="reportTxt"></pre></details>
+    </section>
+  </div>
+
+  <section class="card" aria-label="Evolution">
+    <h2>Evolution</h2>
+    <div class="timeline" id="timeline"></div>
+    <p class="note" id="timelineNote"></p>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const r1 = (v) => Math.round(v * 10) / 10;
+  function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+  /* ===================== RULES OF THE WORKSHOP ===================== */
+  const BUDGET = 60, MAX_PARTS = 24;
+  const BOX = { x: 1.6, z: 1.3, h: 2.4 };
+  const TYPES = ["block", "wheel", "tread", "hover", "spinner", "hinge", "spike", "launcher", "battery", "sensor"];
+  const num = (v, lo, hi, d) => { v = Number(v); if (!Number.isFinite(v)) v = d; return clamp(v, lo, hi); };
+  const vec = (v, d) => (Array.isArray(v) && v.length >= 3 ? [0, 1, 2].map((i) => (Number.isFinite(+v[i]) ? +v[i] : d[i])) : d.slice());
+
+  function partCost(p) {
+    switch (p.type) {
+      case "block": return Math.max(1, p.size[0] * p.size[1] * p.size[2] * (p.material === "steel" ? 7 : 3));
+      case "wheel": return 2 + p.radius * 2;
+      case "tread": return 4 + p.length * 2;
+      case "hover": return 5;
+      case "spinner": return 4 + p.radius * 5 + (p.shape === "bar" ? 0 : 2);
+      case "hinge": return 4 + p.length * 1.5 + p.head * 2 + p.power * 2;
+      case "spike": return 1;
+      case "launcher": return 5 + p.caliber * 3;
+      case "battery": return p.size === "large" ? 6 : 3;
+      case "sensor": return 2 + p.range * 0.2;
+    }
+    return 0;
+  }
+  function partMass(p) {
+    switch (p.type) {
+      case "block": return p.size[0] * p.size[1] * p.size[2] * (p.material === "steel" ? 3.5 : 1.2) + 0.05;
+      case "wheel": return 0.4 + p.radius * 0.8;
+      case "tread": return 1.0 * p.length;
+      case "hover": return 0.4;
+      case "spinner": return spinMass(p);
+      case "hinge": return 0.3 * p.length * p.width + p.head;
+      case "spike": return 0.1;
+      case "launcher": return 0.5 + p.caliber * 0.4;
+      case "battery": return p.size === "large" ? 1.2 : 0.6;
+      case "sensor": return 0.1;
+    }
+    return 0.1;
+  }
+  const spinMass = (p) => p.radius * ({ bar: 1.2, disc: 1.8, drum: 2.2 }[p.shape]);
+  function partHp(p) {
+    switch (p.type) {
+      case "block": return p.size[0] * p.size[1] * p.size[2] * (p.material === "steel" ? 150 : 60) + 8;
+      case "wheel": return 18 + p.radius * 20;
+      case "tread": return 30 + 25 * p.length;
+      case "hover": return 12;
+      case "spinner": return 20 + p.radius * 12;
+      case "hinge": return 14 + p.head * 4;
+      case "spike": return 8;
+      case "launcher": return 16;
+      case "battery": return 14;
+      case "sensor": return 6;
+    }
+    return 10;
+  }
+  const headSize = (p) => 0.25 + p.head * 0.12;
+  const launcherLen = (p) => 0.6 + p.caliber * 0.2;
+
+  // Axis-aligned bounds in the robot's own frame (x forward, y up, z sideways).
+  function partBox(p) {
+    const [x, y, z] = p.pos;
+    let mn, mx;
+    switch (p.type) {
+      case "block": {
+        const t = p.tilt * Math.PI / 180, c = Math.abs(Math.cos(t)), s = Math.abs(Math.sin(t));
+        const ex = c * p.size[0] / 2 + s * p.size[1] / 2, ey = s * p.size[0] / 2 + c * p.size[1] / 2;
+        mn = [x - ex, y - ey, z - p.size[2] / 2]; mx = [x + ex, y + ey, z + p.size[2] / 2]; break;
+      }
+      case "wheel": mn = [x - p.radius, y - p.radius, z - p.width / 2]; mx = [x + p.radius, y + p.radius, z + p.width / 2]; break;
+      case "tread": mn = [x - p.length / 2, y - p.height / 2, z - p.width / 2]; mx = [x + p.length / 2, y + p.height / 2, z + p.width / 2]; break;
+      case "hover": mn = [x - p.radius, y - 0.08, z - p.radius]; mx = [x + p.radius, y + 0.08, z + p.radius]; break;
+      case "spinner": {
+        const r = p.radius, th = p.shape === "drum" ? 0.3 : p.shape === "bar" ? 0.15 : 0.06;
+        if (p.axis === "vertical") { mn = [x - r, y - th, z - r]; mx = [x + r, y + th, z + r]; }
+        else { mn = [x - r, y - r, z - (p.shape === "drum" ? 0.5 : th)]; mx = [x + r, y + r, z + (p.shape === "drum" ? 0.5 : th)]; }
+        break;
+      }
+      case "hinge": {
+        if (p.swing === "up") { mn = [x - 0.05, y - 0.05, z - p.width / 2]; mx = [x + p.length, y + 0.05, z + p.width / 2]; }
+        else { const hs = headSize(p); mn = [x - Math.max(0.08, hs / 2), y, z - Math.max(0.08, hs / 2)]; mx = [x + Math.max(0.08, hs / 2), y + p.length + hs / 2, z + Math.max(0.08, hs / 2)]; }
+        break;
+      }
+      case "spike": {
+        const e = [x + p.dir[0] * p.length, y + p.dir[1] * p.length, z + p.dir[2] * p.length];
+        mn = [Math.min(x, e[0]) - 0.05, Math.min(y, e[1]) - 0.05, Math.min(z, e[2]) - 0.05]; mx = [Math.max(x, e[0]) + 0.05, Math.max(y, e[1]) + 0.05, Math.max(z, e[2]) + 0.05]; break;
+      }
+      case "launcher": { const L = launcherLen(p), rr = 0.1 + p.caliber * 0.05; mn = [x - 0.2, y - rr - 0.08, z - 0.2]; mx = [x + L, y + rr, z + 0.2]; break; }
+      case "battery": { const b = p.size === "large" ? [0.6, 0.3, 0.4] : [0.4, 0.25, 0.3]; mn = [x - b[0] / 2, y - b[1] / 2, z - b[2] / 2]; mx = [x + b[0] / 2, y + b[1] / 2, z + b[2] / 2]; break; }
+      case "sensor": mn = [x - 0.1, y, z - 0.1]; mx = [x + 0.1, y + 0.5, z + 0.1]; break;
+    }
+    return { mn, mx };
+  }
+  // The lowest point at the very front of each part (what slides under the opponent).
+  function frontPoints(p) {
+    const b = partBox(p), [x, y] = p.pos;
+    if (p.type === "block") {
+      const t = p.tilt * Math.PI / 180, hx = p.size[0] / 2, hy = p.size[1] / 2;
+      return [[hx, hy], [hx, -hy], [-hx, hy], [-hx, -hy]].map(([a, c]) => [x + a * Math.cos(t) - c * Math.sin(t), y + a * Math.sin(t) + c * Math.cos(t)]);
+    }
+    if (p.type === "wheel" || (p.type === "spinner")) return [[b.mx[0], y]];
+    if (p.type === "hinge" && p.swing === "up") return [[x + p.length, y]];
+    return [[b.mx[0], b.mn[1]]];
+  }
+
+  function label(p) {
+    const side = p.pos[2] < -0.15 ? "left " : p.pos[2] > 0.15 ? "right " : "";
+    const fb = p.pos[0] > 0.4 ? "front " : p.pos[0] < -0.4 ? "rear " : "";
+    const name = p.type === "block" ? (p.material === "steel" ? "steel block" : "block") : p.type === "hinge" ? (p.swing === "up" ? "lifting arm" : "hammer arm") : p.type === "spinner" ? `${p.shape} spinner` : p.type;
+    return (fb + side + name).trim();
+  }
+
+  // Turn whatever the agent wrote into a buildable robot, and say what had to change.
+  function sanitize(raw) {
+    const notes = [];
+    const d = {
+      name: String(raw && raw.name || "Unnamed").slice(0, 24).toUpperCase(),
+      idea: String(raw && raw.idea || "").slice(0, 240),
+      reasoning: String(raw && raw.reasoning || "").slice(0, 900),
+      color: /^#[0-9a-f]{6}$/i.test(raw && raw.color) ? raw.color : "#7b3fe4",
+      tactics: { approach: ["charge", "circle", "ambush", "hit-and-run"].includes(raw && raw.tactics && raw.tactics.approach) ? raw.tactics.approach : "charge", preferredRange: num(raw && raw.tactics && raw.tactics.preferredRange, 0, 9, 0) },
+      parts: [],
+    };
+    let spent = 0;
+    const list = Array.isArray(raw && raw.parts) ? raw.parts : [];
+    if (list.length > MAX_PARTS) notes.push({ k: "warn", t: `Wrote ${list.length} parts; only the first ${MAX_PARTS} were built.` });
+    for (const q of list.slice(0, MAX_PARTS)) {
+      if (!q || !TYPES.includes(q.type)) { notes.push({ k: "warn", t: `Ignored an unknown part type "${esc(q && q.type)}".` }); continue; }
+      const p = { type: q.type, pos: vec(q.pos, [0, 0.5, 0]) };
+      switch (q.type) {
+        case "block": p.size = vec(q.size, [1, 0.4, 1]).map((v) => clamp(v, 0.08, 3.2)); p.tilt = num(q.tilt, -60, 60, 0); p.material = q.material === "steel" ? "steel" : "light"; break;
+        case "wheel": p.radius = num(q.radius, 0.2, 0.8, 0.4); p.width = num(q.width, 0.1, 0.5, 0.25); break;
+        case "tread": p.length = num(q.length, 0.5, 3, 1.5); p.height = num(q.height, 0.3, 0.8, 0.5); p.width = num(q.width, 0.2, 0.5, 0.3); break;
+        case "hover": p.radius = num(q.radius, 0.2, 0.5, 0.35); break;
+        case "spinner": p.shape = ["bar", "disc", "drum"].includes(q.shape) ? q.shape : "bar"; p.radius = num(q.radius, 0.3, 1.5, 0.6); p.axis = q.axis === "horizontal" ? "horizontal" : "vertical"; break;
+        case "hinge": p.length = num(q.length, 0.3, 2, 1); p.width = num(q.width, 0.2, 1.5, 0.8); p.swing = q.swing === "down" ? "down" : "up"; p.head = num(q.head, 0, 3, 0); p.power = Math.round(num(q.power, 1, 3, 2)); break;
+        case "spike": { p.length = num(q.length, 0.2, 1, 0.4); const dv = vec(q.dir, [1, 0, 0]); const l = Math.hypot(...dv) || 1; p.dir = dv.map((v) => v / l); break; }
+        case "launcher": p.caliber = Math.round(num(q.caliber, 1, 3, 1)); break;
+        case "battery": p.size = q.size === "large" ? "large" : "small"; break;
+        case "sensor": p.range = num(q.range, 5, 20, 10); break;
+      }
+      const c = partCost(p);
+      if (spent + c > BUDGET + 0.01) { notes.push({ k: "bad", t: `Ran out of scrap: skipped a ${label(p)} (${r1(c)} scrap).` }); continue; }
+      spent += c; p.cost = c;
+      d.parts.push(p);
+    }
+    // keep inside the build box
+    let clipped = false;
+    for (const p of d.parts) {
+      const b = partBox(p);
+      if (b.mx[0] > BOX.x) { p.pos[0] -= b.mx[0] - BOX.x; clipped = true; } if (b.mn[0] < -BOX.x) { p.pos[0] += -BOX.x - b.mn[0]; clipped = true; }
+      if (b.mx[2] > BOX.z) { p.pos[2] -= b.mx[2] - BOX.z; clipped = true; } if (b.mn[2] < -BOX.z) { p.pos[2] += -BOX.z - b.mn[2]; clipped = true; }
+    }
+    if (clipped) notes.push({ k: "warn", t: "Some parts stuck out of the size limit and were pushed back in." });
+    // everything must be attached
+    const boxes = d.parts.map(partBox), n = d.parts.length, par = [...Array(n).keys()];
+    const find = (i) => (par[i] === i ? i : (par[i] = find(par[i])));
+    const touch = (a, b, e = 0.06) => a.mn[0] - e <= b.mx[0] && b.mn[0] - e <= a.mx[0] && a.mn[1] - e <= b.mx[1] && b.mn[1] - e <= a.mx[1] && a.mn[2] - e <= b.mx[2] && b.mn[2] - e <= a.mx[2];
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (touch(boxes[i], boxes[j])) par[find(i)] = find(j);
+    const mass = {};
+    d.parts.forEach((p, i) => { const r = find(i); mass[r] = (mass[r] || 0) + partMass(p) + (p.type === "block" ? 100 : 0); });
+    const main = Object.keys(mass).sort((a, b) => mass[b] - mass[a])[0];
+    const kept = [];
+    d.parts.forEach((p, i) => { if (String(find(i)) === main) kept.push(p); else notes.push({ k: "bad", t: `The ${label(p)} wasn't attached to anything and fell off.` }); });
+    d.parts = kept;
+    if (!d.parts.some((p) => p.type === "block")) notes.push({ k: "bad", t: "There is no chassis block: the robot is very fragile." });
+    // rest on the floor
+    if (d.parts.length) {
+      const minB = Math.min(...d.parts.map((p) => partBox(p).mn[1] - (p.type === "hover" ? 0.25 : 0)));
+      d.parts.forEach((p) => (p.pos[1] -= minB));
+      const top = Math.max(...d.parts.map((p) => partBox(p).mx[1]));
+      if (top > BOX.h) notes.push({ k: "warn", t: `It stands ${r1(top)} m tall, over the ${BOX.h} m guideline.` });
+    }
+    d.spent = d.parts.reduce((s, p) => s + p.cost, 0);
+    return { design: d, notes };
+  }
+
+  // Everything about how the robot performs comes from its parts.
+  function derive(parts) {
+    const S = { notes: [] }, note = (k, t) => S.notes.push({ k, t });
+    const boxes = parts.map(partBox);
+    S.mass = parts.reduce((s, p) => s + partMass(p), 0) || 0.1;
+    S.hp = parts.reduce((s, p) => s + partHp(p), 0);
+    S.blockHp = parts.filter((p) => p.type === "block").reduce((s, p) => s + partHp(p), 0);
+    let cy = 0; parts.forEach((p) => (cy += partMass(p) * p.pos[1])); S.comY = cy / S.mass;
+    S.minX = Math.min(0, ...boxes.map((b) => b.mn[0])); S.maxX = Math.max(0, ...boxes.map((b) => b.mx[0]));
+    S.minZ = Math.min(0, ...boxes.map((b) => b.mn[2])); S.maxZ = Math.max(0, ...boxes.map((b) => b.mx[2]));
+    S.top = Math.max(0.2, ...boxes.map((b) => b.mx[1]));
+    S.radius = Math.max(0.6, Math.max(-S.minX, S.maxX, -S.minZ, S.maxZ) * 0.85);
+    // power
+    S.capacity = 4 + parts.filter((p) => p.type === "battery").reduce((s, p) => s + (p.size === "large" ? 10 : 5), 0);
+    S.draw = parts.reduce((s, p) => s + ({ wheel: 0.5, tread: 1.2, hover: 1.0 }[p.type] || 0) + (p.type === "spinner" ? p.radius * 2.5 * (p.shape === "bar" ? 1 : 1.2) : 0) + (p.type === "hinge" ? p.power * 1.2 : 0) + (p.type === "launcher" ? p.caliber * 0.8 : 0), 0);
+    S.pf = S.draw > S.capacity ? S.capacity / S.draw : 1;
+    if (S.pf < 1) note("warn", `Needs ${r1(S.draw)} power but the batteries give ${r1(S.capacity)}. Every motor runs at ${Math.round(S.pf * 100)}%.`);
+    // drive
+    const contact = parts.filter((p, i) => (p.type === "wheel" || p.type === "tread") ? boxes[i].mn[1] <= 0.04 : p.type === "hover" ? boxes[i].mn[1] <= 0.3 : false);
+    const lost = parts.filter((p) => (p.type === "wheel" || p.type === "tread" || p.type === "hover") && !contact.includes(p));
+    let dragArea = 0;
+    parts.forEach((p, i) => { if (boxes[i].mn[1] <= 0.02 && !["wheel", "tread", "hover", "spike"].includes(p.type)) dragArea += p.type === "block" ? (Math.abs(p.tilt) > 5 ? p.size[2] * 0.1 : p.size[0] * p.size[2]) : 0.3; });
+    let traction = 0, left = 0, right = 0;
+    for (const p of contact) {
+      const t = p.type === "wheel" ? 0.6 + p.width : p.type === "tread" ? p.length * 1.2 : 0.5;
+      traction += t;
+      if (p.pos[2] < -0.05) left += t; else if (p.pos[2] > 0.05) right += t; else { left += t / 2; right += t / 2; }
+    }
+    S.traction = traction;
+    S.hovers = contact.length > 0 && contact.every((p) => p.type === "hover");
+    S.oneSided = contact.length > 0 && (left < 0.05 || right < 0.05);
+    S.drag = contact.length === 0 ? 1 : dragArea > 0.8 ? 0.45 : dragArea > 0.15 ? 0.8 : 1;
+    if (!contact.length) { S.speed = 0.6; note("bad", lost.length ? "Its wheels don't reach the floor, so it can only scoot around slowly." : "It has nothing to drive with, so it can only scoot around slowly."); }
+    else {
+      S.speed = clamp(16 * Math.sqrt(traction) / Math.sqrt(S.mass + 1), 1, 14) * S.pf * S.drag * (S.hovers ? 1.25 : 1);
+      if (S.oneSided) { S.speed *= 0.35; note("bad", `All the drive is on the ${left < 0.05 ? "right" : "left"} side, so it can only drive in circles.`); }
+      if (S.drag < 1) note(S.drag < 0.6 ? "bad" : "warn", S.drag < 0.6 ? "Its belly sits on the floor and drags. Much slower." : "Something scrapes the floor. A little slower.");
+      if (lost.length) note("warn", `${lost.length} drive part${lost.length > 1 ? "s don't" : " doesn't"} touch the floor and ${lost.length > 1 ? "do" : "does"} nothing.`);
+    }
+    S.push = traction * S.pf * Math.sqrt(S.mass) * (S.hovers ? 0.4 : 1);
+    const track = contact.length ? Math.max(...contact.map((p) => Math.abs(p.pos[2]))) : 0.3;
+    S.turn = clamp(1.5 + track * 2.2 - S.mass * 0.04, 1, 5) * (S.hovers ? 1.3 : 1);
+    // balance
+    const halfW = contact.length ? Math.max(0.2, ...contact.map((p) => Math.abs(p.pos[2]) + (p.width || p.radius || 0.3) / 2)) : Math.max(-S.minZ, S.maxZ);
+    S.flipResist = r1((halfW / (S.comY + 0.15)) * (1 + S.mass * 0.03));
+    const driveTop = Math.max(0, ...contact.map((p) => partBox(p).mx[1]));
+    const otherTop = Math.max(0, ...parts.filter((p) => !contact.includes(p)).map((p) => partBox(p).mx[1]));
+    S.invertible = contact.length > 0 && driveTop >= otherTop - 0.02 && !S.hovers;
+    S.selfRight = parts.some((p) => p.type === "hinge" && p.swing === "up" && p.power >= 2);
+    if (S.flipResist < 1.1) note("bad", `Top-heavy (flip resistance ${S.flipResist}). Easy to tip over.`);
+    else if (S.flipResist > 2.2) note("good", `Very stable (flip resistance ${S.flipResist}). Hard to tip over.`);
+    if (S.invertible) note("good", "Its wheels stick out above everything else, so it keeps driving upside down.");
+    else if (S.selfRight) note("good", "Its lifting arm can push it back upright after a flip.");
+    else note("warn", "If it's flipped it can't get back up, and it's out after 5 seconds.");
+    // front
+    const pts = parts.flatMap(frontPoints);
+    S.frontX = S.maxX;
+    const near = pts.filter(([x]) => x >= S.frontX - 0.35);
+    S.frontLow = near.length ? Math.max(0, Math.min(...near.map(([, y]) => y))) : 0.5;
+    if (S.frontLow <= 0.08) note("good", `Its front edge is ${Math.round(S.frontLow * 100)} cm off the floor. It will get under most opponents.`);
+    // weapons
+    S.weapons = [];
+    S.spikes = 0;
+    parts.forEach((p, i) => {
+      const b = boxes[i];
+      if (p.type === "spinner") {
+        const ms = spinMass(p);
+        const full = p.axis === "vertical" && p.radius >= 0.85 * Math.max(-S.minX, S.maxX, -S.minZ, S.maxZ);
+        const front = b.mx[0] >= S.frontX - 0.25;
+        if (!full && !front) { note("bad", `The ${label(p)} is tucked behind the front and can't reach anyone.`); return; }
+        S.weapons.push({ kind: "spinner", part: p, dmg: (8 + ms * 9) * Math.sqrt(S.pf), cd: 1.0 / Math.max(0.3, S.pf), arc: full ? Math.PI : 0.7, reach: b.mx[0], lift: p.axis === "horizontal", knock: p.axis === "vertical" ? 2.6 : 1.2 });
+      } else if (p.type === "hinge" && p.swing === "up") {
+        if (b.mx[0] < S.frontX - 0.2) { note("bad", `The ${label(p)} isn't at the front, so it has nothing to lift.`); return; }
+        S.weapons.push({ kind: "lifter", part: p, dmg: 3 + p.power * 2, cd: 1.4 / Math.max(0.4, S.pf), arc: 0.6, reach: b.mx[0], flip: p.power * (0.5 + p.length * 0.3) * S.pf });
+      } else if (p.type === "hinge") {
+        const reach = p.pos[0] + p.length + headSize(p) / 2;
+        const self = reach < S.frontX + 0.05;
+        if (self) note("bad", `The ${label(p)} is too short to reach past its own front. It will hit its own body.`);
+        S.weapons.push({ kind: "hammer", part: p, dmg: (6 + p.head * 6 + p.length * 2) * S.pf, cd: 1.8 / Math.max(0.4, S.pf), arc: 0.5, reach, self });
+      } else if (p.type === "launcher") {
+        if (b.mx[0] < S.frontX - 0.4) { note("bad", "The launcher fires into its own body."); return; }
+        S.weapons.push({ kind: "launcher", part: p, dmg: 3 + p.caliber * 3, cd: 1.2, arc: 0.3, reach: 9, ranged: true });
+      } else if (p.type === "spike") {
+        const tipX = p.pos[0] + p.dir[0] * p.length;
+        if (p.dir[0] > 0.5 && tipX >= S.frontX - 0.1) S.spikes++;
+      }
+    });
+    S.sensor = Math.max(6, ...parts.filter((p) => p.type === "sensor").map((p) => p.range));
+    if (!S.weapons.length && !S.spikes) note("warn", "No working weapon. It can only push and ram.");
+    return S;
+  }
+
+  /* ===================== TEST OPPONENTS ===================== */
+  const OPPONENTS = [
+    { name: "BRICK", color: "#8c6a4f", idea: "A heavy steel box with spikes that just rams.", tactics: { approach: "charge", preferredRange: 0 }, parts: [
+      { type: "block", size: [2.2, 0.6, 1.6], pos: [0, 0.55, 0], material: "steel" },
+      { type: "wheel", radius: 0.45, width: 0.3, pos: [0.6, 0.45, -0.95] }, { type: "wheel", radius: 0.45, width: 0.3, pos: [0.6, 0.45, 0.95] },
+      { type: "wheel", radius: 0.45, width: 0.3, pos: [-0.6, 0.45, -0.95] }, { type: "wheel", radius: 0.45, width: 0.3, pos: [-0.6, 0.45, 0.95] },
+      { type: "spike", length: 0.4, pos: [1.1, 0.55, -0.5], dir: [1, 0, 0] }, { type: "spike", length: 0.4, pos: [1.1, 0.55, 0.5], dir: [1, 0, 0] }, { type: "spike", length: 0.4, pos: [1.1, 0.55, 0], dir: [1, 0, 0] },
+      { type: "battery", size: "small", pos: [-0.4, 0.95, 0] },
+    ] },
+    { name: "SNAPPER", color: "#3d5afe", idea: "A low wedge that slides underneath and flips.", tactics: { approach: "charge", preferredRange: 0 }, parts: [
+      { type: "block", size: [1.6, 0.45, 1.5], pos: [-0.3, 0.45, 0], material: "light" },
+      { type: "block", size: [0.9, 0.08, 1.4], pos: [0.85, 0.2, 0], tilt: -22, material: "steel" },
+      { type: "hinge", length: 0.9, width: 1.2, pos: [0.45, 0.3, 0], swing: "up", power: 3, head: 0 },
+      { type: "wheel", radius: 0.4, width: 0.25, pos: [0.2, 0.4, -0.9] }, { type: "wheel", radius: 0.4, width: 0.25, pos: [0.2, 0.4, 0.9] },
+      { type: "wheel", radius: 0.4, width: 0.25, pos: [-0.8, 0.4, -0.9] }, { type: "wheel", radius: 0.4, width: 0.25, pos: [-0.8, 0.4, 0.9] },
+      { type: "battery", size: "large", pos: [-0.4, 0.8, 0] },
+    ] },
+    { name: "WHIRL", color: "#ff6fa8", idea: "A small body with a huge spinning bar on top.", tactics: { approach: "circle", preferredRange: 0 }, parts: [
+      { type: "block", size: [1.4, 0.5, 1.4], pos: [0, 0.5, 0], material: "light" },
+      { type: "spinner", shape: "bar", radius: 1.4, axis: "vertical", pos: [0, 0.9, 0] },
+      { type: "wheel", radius: 0.35, width: 0.25, pos: [0, 0.35, -0.85] }, { type: "wheel", radius: 0.35, width: 0.25, pos: [0, 0.35, 0.85] },
+      { type: "block", size: [0.3, 0.2, 0.3], pos: [0.55, 0.15, 0], material: "light" },
+      { type: "battery", size: "large", pos: [-0.3, 0.9, 0] },
+    ] },
+  ].map((o) => { const s = sanitize(o).design; s.idea = o.idea; return s; });
+
+  /* ===================== FIGHT SIMULATION ===================== */
+  const ARENA = 11, FIGHT_TIME = 30, DT = 1 / 60;
+  function createFight(dA, dB, seed) {
+    const rng = mulberry32(seed);
+    const mk = (d, side) => {
+      const parts = d.parts.map((p) => ({ ...p, pos: p.pos.slice(), hp: partHp(p), maxHp: partHp(p), id: Math.random().toString(36).slice(2) }));
+      const f = { d, parts, st: derive(parts), x: side * 6, z: 0, h: side > 0 ? Math.PI : 0, v: 0, flipped: false, flipT: 0, stuckT: 0, immobileT: 0, stun: 0, cds: new Map(), dealt: 0, taken: 0, flipsDone: 0, flipsTaken: 0, selfRights: 0, lost: [], events: [], ko: null, mode: 0, modeT: 0, reached: false, selfHits: 0, maxV: 0, swing: new Map() };
+      f.blockHp0 = f.st.blockHp || 1;
+      return f;
+    };
+    const F = { a: mk(dA, -1), b: mk(dB, 1), t: 0, over: false, winner: null, fx: [] };
+    const log = (f, t) => f.events.push({ t: F.t, text: t });
+    const fx = (e) => F.fx.push(e);
+    const wrapA = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+    const angleTo = (f, o) => Math.abs(wrapA(Math.atan2(-(o.z - f.z), o.x - f.x) - f.h));
+
+    function hurt(T, A, dmg, cause) {
+      if (T.ko || dmg <= 0) return;
+      // hits land on the side facing the attacker
+      const hx = A.x - T.x, hz = A.z - T.z, L = Math.hypot(hx, hz) || 1;
+      const c = Math.cos(-T.h), s = Math.sin(-T.h);
+      const lx = (hx * c + hz * s) / L, lz = (-hx * s + hz * c) / L;
+      let tot = 0;
+      const w = T.parts.map((p) => { const d = Math.hypot(p.pos[0], p.pos[2]) || 1; const k = Math.max(0.06, (p.pos[0] * lx + (-p.pos[2]) * lz) / d + 0.35) * (p.type === "block" ? 1 : 1.4); tot += k; return k; });
+      let r = rng() * tot, i = 0;
+      while (i < w.length - 1 && r > w[i]) { r -= w[i]; i++; }
+      const p = T.parts[i];
+      if (!p) return;
+      p.hp -= dmg; T.taken += dmg; if (A !== T) A.dealt += dmg;
+      fx({ type: "hit", who: T, part: p.id, cause });
+      if (p.hp <= 0) {
+        T.parts.splice(i, 1);
+        T.lost.push(label(p));
+        log(T, `lost its ${label(p)}`);
+        fx({ type: "detach", who: T, part: p.id });
+        T.st = derive(T.parts);
+        if (!T.parts.length || T.st.blockHp <= T.blockHp0 * 0.25) { T.ko = "its chassis was smashed apart"; log(T, "chassis smashed apart"); }
+      }
+    }
+    function flip(T, A) {
+      if (T.flipped) return;
+      T.flipped = true; T.flipT = 0; T.flipsTaken++; A.flipsDone++;
+      log(T, "got flipped over"); fx({ type: "flip", who: T });
+    }
+    function drive(f, tx, tz, dt, back = false) {
+      const st = f.st;
+      let want = Math.atan2(-(tz - f.z), tx - f.x);
+      if (back) want = wrapA(want + Math.PI);
+      const diff = wrapA(want - f.h);
+      f.h += clamp(diff, -st.turn * dt, st.turn * dt);
+      if (st.oneSided) f.h += 1.6 * dt;
+      const sp = st.speed * Math.max(0.1, Math.cos(diff)) * (back ? -0.6 : 1);
+      f.v += (sp - f.v) * Math.min(1, dt * 3);
+    }
+    function think(f, o, dt) {
+      const d = Math.hypot(o.x - f.x, o.z - f.z), tac = f.d.tactics;
+      f.modeT -= dt;
+      if (tac.preferredRange >= 3) {
+        if (d < tac.preferredRange - 1) return drive(f, o.x, o.z, dt, true);
+        if (d > tac.preferredRange + 1) return drive(f, o.x, o.z, dt);
+        const want = Math.atan2(-(o.z - f.z), o.x - f.x);
+        f.h += clamp(wrapA(want - f.h), -f.st.turn * dt, f.st.turn * dt);
+        f.v *= 0.85; return;
+      }
+      if (tac.approach === "ambush" && d > 6 && f.mode === 0) { f.v *= 0.9; const want = Math.atan2(-(o.z - f.z), o.x - f.x); f.h += clamp(wrapA(want - f.h), -f.st.turn * dt, f.st.turn * dt); return; }
+      if (tac.approach === "circle" && f.mode === 0) {
+        if (d < 4.5 || f.modeT < -3) { f.mode = 1; f.modeT = 1.6; }
+        else { const a = Math.atan2(f.z - o.z, f.x - o.x) + 0.9; return drive(f, o.x + Math.cos(a) * 4, o.z + Math.sin(a) * 4, dt); }
+      }
+      if (tac.approach === "hit-and-run" && f.mode === 2) { if (f.modeT <= 0) f.mode = 0; return drive(f, o.x, o.z, dt, true); }
+      if (f.mode === 1 && f.modeT <= 0) { f.mode = 0; f.modeT = 0; }
+      drive(f, o.x, o.z, dt);
+    }
+    function weapons(f, o) {
+      const d = Math.hypot(o.x - f.x, o.z - f.z), ang = angleTo(f, o);
+      for (const w of f.st.weapons) {
+        if (!f.parts.some((p) => p === w.part || p.id === w.part.id)) continue;
+        const key = w.part.id || w.part;
+        if ((f.cds.get(key) || 0) > 0) continue;
+        if (f.flipped && (w.part.pos[1] > f.st.comY || w.kind === "lifter")) continue;
+        const reach = w.ranged ? w.reach : w.reach + o.st.radius * 0.95;
+        if (d > reach || ang > w.arc) continue;
+        f.cds.set(key, w.cd);
+        f.swing.set(key, 1);
+        f.reached = true;
+        fx({ type: "fire", who: f, part: w.part.id, kind: w.kind });
+        if (w.kind === "spinner") {
+          hurt(o, f, w.dmg, "spinner"); hurt(f, o, w.dmg * 0.12, "recoil");
+          const k = w.knock / Math.max(0.6, Math.sqrt(o.st.mass) * 0.5) * (o.st.hovers ? 1.8 : 1);
+          o.x += ((o.x - f.x) / (d || 1)) * k; o.z += ((o.z - f.z) / (d || 1)) * k;
+          if (w.lift && !o.flipped && rng() < clamp(w.dmg / 40 / o.st.flipResist, 0.03, 0.4)) flip(o, f);
+        } else if (w.kind === "lifter") {
+          const under = f.st.frontLow <= o.st.frontLow + 0.06;
+          hurt(o, f, w.dmg, "lifter");
+          if (under && !o.flipped && rng() < clamp(w.flip / (o.st.flipResist * 5), 0.04, 0.55)) flip(o, f);
+          else if (!under && rng() < 0.3) log(f, "couldn't get its lifting arm under the opponent");
+        } else if (w.kind === "hammer") {
+          if (w.self) { hurt(f, f, w.dmg * 0.5, "own hammer"); f.selfHits++; if (f.selfHits === 1) log(f, "hit its own body with its hammer"); }
+          else hurt(o, f, w.dmg, "hammer");
+        } else if (w.kind === "launcher") {
+          fx({ type: "shot", who: f, to: o });
+          if (rng() < 0.75) hurt(o, f, w.dmg, "launcher");
+        }
+        if (f.d.tactics.approach === "hit-and-run" && !w.ranged) { f.mode = 2; f.modeT = 1.2; }
+      }
+    }
+    function step() {
+      if (F.over) return;
+      F.t += DT;
+      const pair = [[F.a, F.b], [F.b, F.a]];
+      for (const [f, o] of pair) {
+        for (const [k, v] of f.cds) f.cds.set(k, v - DT);
+        for (const [k, v] of f.swing) f.swing.set(k, Math.max(0, v - DT * 2.5));
+        if (f.ko) continue;
+        if (f.flipped) {
+          f.flipT += DT;
+          if (f.st.selfRight && f.flipT > 1.4) { f.flipped = false; f.selfRights++; log(f, "pushed itself back upright"); fx({ type: "unflip", who: f }); }
+          else if (!f.st.invertible && !f.st.selfRight && f.flipT > 5) { f.ko = "it was stuck upside down"; log(f, "stuck upside down for 5 s: out"); }
+        }
+        const canDrive = !f.flipped || f.st.invertible;
+        if (canDrive) think(f, o, DT); else f.v *= 0.9;
+        if (f.st.speed < 1 && canDrive) { f.immobileT += DT; } else f.immobileT = 0;
+        f.x += Math.cos(f.h) * f.v * DT; f.z -= Math.sin(f.h) * f.v * DT;
+        f.maxV = Math.max(f.maxV, Math.abs(f.v));
+        const r = Math.hypot(f.x, f.z), lim = ARENA - f.st.radius;
+        if (r > lim) { f.x *= lim / r; f.z *= lim / r; f.v *= 0.5; }
+      }
+      // collisions and rams
+      const A = F.a, B = F.b;
+      const dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz) || 0.001, m = A.st.radius + B.st.radius;
+      if (d < m) {
+        const nx = dx / d, nz = dz / d, ov = m - d;
+        const va = Math.cos(A.h) * A.v * nx - Math.sin(A.h) * A.v * nz, vb = -(Math.cos(B.h) * B.v * nx - Math.sin(B.h) * B.v * nz);
+        const pa = A.st.push + 0.1, pb = B.st.push + 0.1;
+        A.x -= nx * ov * pb / (pa + pb); A.z -= nz * ov * pb / (pa + pb); B.x += nx * ov * pa / (pa + pb); B.z += nz * ov * pa / (pa + pb);
+        for (const [f, o, vv] of [[A, B, va], [B, A, vb]]) {
+          if (!f.ko && vv > 2.5 && angleTo(f, o) < 0.6 && ((f.ramCd || 0) <= 0)) {
+            f.ramCd = 0.6; f.reached = true;
+            hurt(o, f, Math.min(28, 0.12 * f.st.mass * vv * 3 + f.st.spikes * 2.5), "ram");
+            fx({ type: "ram", who: f });
+          }
+        }
+        A.v *= 0.6; B.v *= 0.6;
+      }
+      for (const f of [A, B]) f.ramCd = (f.ramCd || 0) - DT;
+      if (!A.ko && !A.flipped) weapons(A, B);
+      if (!B.ko && !B.flipped) weapons(B, A);
+      if (!A.ko && A.flipped && A.st.invertible) weapons(A, B);
+      if (!B.ko && B.flipped && B.st.invertible) weapons(B, A);
+      for (const f of [A, B]) if (!f.ko && f.immobileT > 6) { f.ko = "it couldn't move"; log(f, "couldn't move for 6 s: out"); }
+      if (A.ko || B.ko || F.t >= FIGHT_TIME) {
+        F.over = true;
+        if (A.ko && B.ko) F.winner = null;
+        else if (A.ko) F.winner = B; else if (B.ko) F.winner = A;
+        else { const ra = A.dealt, rb = B.dealt; F.winner = Math.abs(ra - rb) < Math.max(ra, rb) * 0.12 ? null : ra > rb ? A : B; F.decision = true; }
+      }
+    }
+    F.step = step;
+    return F;
+  }
+  function runHeadless(dA, dB, seed) { const F = createFight(dA, dB, seed); let n = 0; while (!F.over && n++ < 60 * 40) { F.step(); F.fx.length = 0; } return F; }
+
+  function summarize(F, oppName) {
+    const me = F.a, op = F.b;
+    const res = F.winner === me ? "W" : F.winner === op ? "L" : "D";
+    const lines = [];
+    const how = F.winner === me ? (op.ko ? `Won in ${Math.round(F.t)} s: ${op.ko}.` : "Won on damage after 30 s.") : F.winner === op ? (me.ko ? `Lost in ${Math.round(F.t)} s: ${me.ko}.` : "Lost on damage after 30 s.") : "Draw after 30 s.";
+    lines.push(how);
+    lines.push(`Dealt ${Math.round(me.dealt)} damage, took ${Math.round(me.taken)}.`);
+    if (!me.reached) lines.push("Never landed a hit.");
+    if (me.flipsTaken) lines.push(`Got flipped ${me.flipsTaken} time${me.flipsTaken > 1 ? "s" : ""}${me.selfRights ? `, pushed itself back up ${me.selfRights}×` : ""}.`);
+    if (me.flipsDone) lines.push(`Flipped ${oppName} ${me.flipsDone}×.`);
+    if (me.lost.length) lines.push(`Parts that broke off: ${me.lost.join(", ")}.`);
+    if (me.selfHits) lines.push(`Hit itself with its own hammer ${me.selfHits}×.`);
+    if (me.st.oneSided) lines.push("Drove in circles (drive on one side only).");
+    lines.push(`Top speed ${r1(me.maxV)} m/s.`);
+    return { res, lines, t: F.t };
+  }
+  function gauntlet(design, vIndex) {
+    return OPPONENTS.map((o, i) => { const F = runHeadless(design, o, 1000 + vIndex * 17 + i * 101); return { opp: o.name, seed: 1000 + vIndex * 17 + i * 101, ...summarize(F, o.name) }; });
+  }
+  function reportText(v) {
+    return v.results.map((r) => `vs ${r.opp}: ${r.res === "W" ? "WIN" : r.res === "L" ? "LOSS" : "DRAW"}. ${r.lines.join(" ")}`).join("\n")
+      + "\nPhysics notes: " + v.allNotes.map((n) => n.t).join(" ");
+  }
+
+  /* ===================== DESIGNERS ===================== */
+  const CATALOG = `COORDINATES (metres): x = forward (the front is +x), y = up, z = sideways. Each part's "pos":[x,y,z] is its centre. The robot must fit in x -1.6..1.6 and z -1.3..1.3, ideally under 2.4 tall. The lowest part rests on the floor.
+
+BUDGET: 60 scrap, at most 24 parts. Costs are listed per part.
+
+PARTS:
+- block {"type":"block","size":[sx,sy,sz],"pos":[x,y,z],"tilt":degrees,"material":"light"|"steel"}: structure and armour. tilt (-60..60) rotates it about the sideways axis; positive raises its front edge, so a tilted plate makes a ramp or wedge. Cost: volume×3 (light) or volume×7 (steel), minimum 1. Steel is 3× heavier and 2.5× tougher.
+- wheel {"type":"wheel","radius":0.2-0.8,"width":0.1-0.5,"pos":[...]}: the axle runs sideways. Drives only if it touches the floor. Cost 2+radius×2.
+- tread {"type":"tread","length":0.5-3,"height":0.3-0.8,"width":0.2-0.5,"pos":[...]}: strong grip, heavy. Cost 4+length×2.
+- hover {"type":"hover","radius":0.2-0.5,"pos":[...]}: floats just above the floor; fast, easily pushed. Cost 5.
+- spinner {"type":"spinner","shape":"bar"|"disc"|"drum","radius":0.3-1.5,"axis":"vertical"|"horizontal","pos":[...]}: a powered spinning weapon. "vertical" spins flat like a helicopter; "horizontal" spins upright, facing forward. Heavier spinners hit harder. Cost 4+radius×5 (+2 for disc or drum).
+- hinge {"type":"hinge","length":0.3-2,"width":0.2-1.5,"pos":[pivot],"swing":"up"|"down","head":0-3,"power":1-3}: a powered arm. "up" lies flat pointing forward from the pivot and snaps upward, lifting whatever is on it. "down" stands upright on the pivot and slams forward and down; head adds weight at the tip. Cost 4+length×1.5+head×2+power×2.
+- spike {"type":"spike","length":0.2-1,"pos":[...],"dir":[dx,dy,dz]}: a static point. Cost 1.
+- launcher {"type":"launcher","caliber":1-3,"pos":[...]}: fires forward, range about 9 m. Cost 5+caliber×3.
+- battery {"type":"battery","size":"small"|"large","pos":[...]}: base power is 4; small adds 5, large adds 10. Cost 3 or 6.
+- sensor {"type":"sensor","range":5-20,"pos":[...]}: spots opponents from further away. Cost 2+range×0.2.
+
+PHYSICS (the game simulates this; nothing is scripted):
+- Every part must touch another part or it falls off.
+- Weight slows you down. Power draw from wheels, treads, hovers, spinners, hinges and launchers above your power capacity weakens every motor.
+- Drive parts must reach the floor. If something else is lower, you scrape along or can't drive.
+- Drive on only one side makes you drive in circles.
+- A high centre of mass and a narrow stance get flipped easily. A flipped robot must push itself back up (an "up" hinge with power 2+) or be able to drive upside down (wheels sticking out above everything else), or it is out after 5 seconds.
+- Whatever sits lowest at the very front gets underneath the other robot; lifting only works from underneath.
+- Parts break off when they lose all their health. Hits land on the side facing the attacker.
+- Spinners take some recoil. A "down" hinge that can't reach past your own front hits your own body.
+
+TACTICS: {"approach":"charge"|"circle"|"ambush"|"hit-and-run","preferredRange":0-9} (use a range of 3+ only for launchers).
+
+TESTS: every version fights three test robots for up to 30 s each: BRICK (heavy steel rammer with front spikes), SNAPPER (low wedge with a strong lifting arm), WHIRL (small body with a huge spinning bar on top).`;
+
+  function buildPrompt(name, instr, history) {
+    const hist = history.slice(-3).map((v) => `VERSION ${v.n} "${v.design.name}" — idea: ${v.design.idea}
+Parts: ${JSON.stringify(v.design.parts.map(({ cost, ...p }) => p))}
+Tactics: ${JSON.stringify(v.design.tactics)}
+Test report:
+${reportText(v)}`).join("\n\n");
+    const older = history.length > 3 ? `Earlier versions: ${history.slice(0, -3).map((v) => `v${v.n} ${v.design.name} (${v.results.map((r) => r.res).join("")})`).join(", ")}.\n\n` : "";
+    return `You are ${name}, an AI agent in a robot-combat game. Your owner gave you one instruction: "${instr}"
+
+${history.length ? `You are designing version ${history.length + 1} of your robot. Study what happened to your previous versions and improve. You may make small changes or try a completely new idea.` : "Design version 1 of your robot."} Be inventive: there are no ready-made weapons, only building blocks. You decide what to build and how the parts work together. Stay within the budget.
+
+${CATALOG}
+
+${older}${hist}
+
+Reply with only a JSON object, no other text:
+{"name":"SHORT NAME","idea":"one sentence","reasoning":"2-4 sentences on what you built or changed and why${history.length ? ", referring to the test report" : ""}","color":"#rrggbb","tactics":{"approach":"charge","preferredRange":0},"parts":[{"type":"block","size":[2,0.4,1.6],"pos":[0,0.5,0],"tilt":0,"material":"light"}]}`;
+  }
+
+  // Scripted stand-in used when Claude isn't available in this view.
+  function demoDesigner(name, instr, history, rng) {
+    const last = history[history.length - 1];
+    const R = (a, b) => a + rng() * (b - a);
+    const base = () => {
+      const kinds = ["wedge", "spinner", "hammer", "rammer", "shooter", "drum"];
+      const want = /flip/i.test(instr) ? "wedge" : /fast|speed/i.test(instr) ? "rammer" : /spin/i.test(instr) ? "spinner" : /far|range|shoot/i.test(instr) ? "shooter" : /heavy|tank|tough/i.test(instr) ? "hammer" : kinds[Math.floor(rng() * kinds.length)];
+      const w = R(1.3, 1.6), L = R(1.6, 2.2);
+      const parts = [
+        { type: "block", size: [L, 0.45, w], pos: [-0.1, 0.5, 0], material: rng() < 0.4 ? "steel" : "light" },
+        { type: "wheel", radius: 0.45, width: 0.25, pos: [0.5, 0.45, -(w / 2 + 0.15)] }, { type: "wheel", radius: 0.45, width: 0.25, pos: [0.5, 0.45, w / 2 + 0.15] },
+        { type: "wheel", radius: 0.45, width: 0.25, pos: [-0.6, 0.45, -(w / 2 + 0.15)] }, { type: "wheel", radius: 0.45, width: 0.25, pos: [-0.6, 0.45, w / 2 + 0.15] },
+      ];
+      let idea = "", tactics = { approach: "charge", preferredRange: 0 };
+      if (want === "wedge") { parts.push({ type: "block", size: [0.9, 0.08, w], pos: [L / 2 + 0.2, 0.2, 0], tilt: -22, material: "steel" }, { type: "hinge", length: 0.9, width: w * 0.9, pos: [L / 2 - 0.2, 0.06, 0], swing: "up", power: 3, head: 0 }, { type: "battery", size: "large", pos: [-0.4, 0.85, 0] }); idea = "A low steel wedge with a strong lifting arm that gets under everything."; }
+      if (want === "spinner") { parts.push({ type: "spinner", shape: "bar", radius: 1.25, axis: "vertical", pos: [0, 0.95, 0] }, { type: "battery", size: "large", pos: [-0.5, 0.85, 0.3] }); idea = "A flat spinning bar over a wide, low body."; tactics.approach = "circle"; }
+      if (want === "hammer") { parts.push({ type: "hinge", length: 1.5, width: 0.3, pos: [0.1, 0.75, 0], swing: "down", head: 2.5, power: 3 }, { type: "battery", size: "large", pos: [-0.6, 0.85, 0] }); idea = "A tough base carrying a heavy hammer that slams from above."; }
+      if (want === "rammer") { parts.push({ type: "spike", length: 0.5, pos: [L / 2 - 0.1, 0.5, -0.4], dir: [1, 0, 0] }, { type: "spike", length: 0.5, pos: [L / 2 - 0.1, 0.5, 0.4], dir: [1, 0, 0] }, { type: "block", size: [0.3, 0.5, w], pos: [L / 2 - 0.1, 0.5, 0], material: "steel" }); idea = "Fast, low and pointy: hit first, hit often."; }
+      if (want === "shooter") { parts.push({ type: "launcher", caliber: 2, pos: [0.3, 0.9, 0] }, { type: "battery", size: "small", pos: [-0.5, 0.85, 0] }); idea = "Keep away and shoot."; tactics = { approach: "circle", preferredRange: 6 }; }
+      if (want === "drum") { parts.push({ type: "spinner", shape: "drum", radius: 0.4, axis: "horizontal", pos: [L / 2 + 0.3, 0.4, 0] }, { type: "battery", size: "large", pos: [-0.5, 0.85, 0] }); idea = "A spinning drum at the front that launches opponents upward."; }
+      return { name: (want === "wedge" ? "SCOOP" : want === "spinner" ? "HALO" : want === "hammer" ? "GAVEL" : want === "rammer" ? "DART" : want === "shooter" ? "POP" : "THUMPER") + "-" + (history.length + 1), idea, reasoning: `First design. My instruction points me toward a ${want} build, so I started from a solid four-wheel base and built around one strong idea.`, color: ["#7b3fe4", "#1ec8a5", "#ff5a36", "#3d5afe", "#ffb703"][Math.floor(rng() * 5)], tactics, parts };
+    };
+    if (!last) return base();
+    const d = JSON.parse(JSON.stringify(last.design));
+    const changes = [];
+    const rep = last.results;
+    const flipped = rep.some((r) => r.lines.some((l) => /flipped \d/.test(l) && l.startsWith("Got")));
+    const lostWheels = rep.some((r) => r.lines.some((l) => /wheel/.test(l) && /broke off/.test(l)));
+    const noHit = rep.filter((r) => r.lines.includes("Never landed a hit.")).length;
+    const selfHit = rep.some((r) => r.lines.some((l) => /own hammer/.test(l)));
+    const st = derive(d.parts);
+    if (selfHit) { const h = d.parts.find((p) => p.type === "hinge" && p.swing === "down"); if (h) { h.length = Math.min(2, h.length + 0.5); h.pos[0] += 0.3; changes.push("made the hammer arm longer and moved it forward so it stops hitting my own body"); } }
+    if (flipped && !st.invertible) {
+      d.parts.forEach((p) => { if (p.type === "wheel") { p.radius = Math.min(0.8, p.radius + 0.15); p.pos[1] = p.radius; } });
+      d.parts.forEach((p) => { if (!["wheel", "tread", "hover"].includes(p.type) && p.pos[1] > 0.45) p.pos[1] -= 0.2; });
+      changes.push("got flipped, so I fitted bigger wheels that stick out above the body so I can keep driving upside down, and lowered the heavy parts");
+    }
+    if (lostWheels) { d.parts.push({ type: "block", size: [0.1, 0.5, 0.5], pos: [0.5, 0.45, d.parts[1] ? d.parts[1].pos[2] - 0.2 * Math.sign(d.parts[1].pos[2]) : -0.9], material: "steel" }); changes.push("my wheels kept breaking off, so I added a steel guard in front of them"); }
+    if (noHit >= 2) {
+      const sp = d.parts.find((p) => p.type === "spinner");
+      if (sp) { sp.radius = Math.min(1.5, sp.radius + 0.25); changes.push("I barely reached anyone, so I made the spinner bigger"); }
+      else { d.parts.push({ type: "spike", length: 0.6, pos: [st.frontX - 0.05, 0.4, 0], dir: [1, 0, 0] }); d.tactics.approach = "charge"; changes.push("I never landed hits, so I added a long spike and switched to charging"); }
+    }
+    if (st.pf < 1) { const b = d.parts.find((p) => p.type === "battery"); if (b && b.size === "small") b.size = "large"; else d.parts.push({ type: "battery", size: "small", pos: [-0.3, 0.9, -0.3] }); changes.push(`motors were starved (${Math.round(st.pf * 100)}% power), so I added battery`); }
+    if (!changes.length || rng() < 0.35) {
+      const r = rng();
+      if (r < 0.33) { d.parts.forEach((p) => { if (p.type === "block" && p.material === "light" && p.size[1] < 0.8) p.material = "steel"; }); changes.push("trying steel armour this time to take more hits"); }
+      else if (r < 0.66) { d.parts.push({ type: "block", size: [0.8, 0.08, 1.2], pos: [st.frontX + 0.25, 0.18, 0], tilt: -20, material: "steel" }); changes.push("experimenting with a low steel wedge at the front"); }
+      else { d.tactics.approach = ["charge", "circle", "hit-and-run"][Math.floor(rng() * 3)]; changes.push(`switching tactics to ${d.tactics.approach}`); }
+    }
+    d.name = d.name.replace(/-\d+$/, "") + "-" + (history.length + 1);
+    d.reasoning = "Changes: " + changes.join("; ") + ".";
+    d.parts = d.parts.map(({ cost, ...p }) => p);
+    return d;
+  }
+
+  /* ===================== 3D ===================== */
+  const stage = $("stage");
+  let renderer = null;
+  try { renderer = window.THREE ? new THREE.WebGLRenderer({ antialias: true }) : null; } catch (e) { renderer = null; }
+  if (!renderer) stage.insertAdjacentHTML("beforeend", '<div class="nogl">The 3D view needs WebGL. Designs and test results still work below.</div>');
+  const lin = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+  const toy = (color, rough = 0.6, metal = 0.05, extra = {}) => { const m = new THREE.MeshStandardMaterial({ color: lin(color), metalness: metal, roughness: rough, ...extra }); if (extra.emissive !== undefined) m.emissive = lin(extra.emissive); return m; };
+
+  function buildRobot(design) {
+    const group = new THREE.Group(), body = new THREE.Group();
+    group.add(body);
+    const byId = new Map();
+    const paint = toy(design.color, 0.5), steel = toy(0xaab3be, 0.35, 0.6), tire = toy(0x3a3440, 0.9), hub = toy(0xffffff, 0.5), metal = toy(0xdfe4ea, 0.3, 0.6), glow = toy(0xbff6ff, 0.3, 0, { emissive: 0x7fe8ff, emissiveIntensity: 1.3 });
+    const add = (m, parent) => { m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); parent.add(m); return m; };
+    for (const p of design.parts) {
+      const g = new THREE.Group();
+      g.position.set(p.pos[0], p.pos[1], p.pos[2]);
+      const anim = {};
+      switch (p.type) {
+        case "block": { const m = new THREE.Mesh(new THREE.BoxGeometry(...p.size), p.material === "steel" ? steel : paint); g.rotation.z = p.tilt * Math.PI / 180; add(m, g); break; }
+        case "wheel": { const m = new THREE.Mesh(new THREE.CylinderGeometry(p.radius, p.radius, p.width, 22), tire); m.rotation.x = Math.PI / 2; add(m, g); const h = new THREE.Mesh(new THREE.CylinderGeometry(p.radius * 0.45, p.radius * 0.45, p.width + 0.02, 12), hub); h.rotation.x = Math.PI / 2; add(h, g); anim.wheel = g; break; }
+        case "tread": { add(new THREE.Mesh(new THREE.BoxGeometry(p.length, p.height, p.width), tire), g); for (const x of [-p.length / 2 + p.height / 2, p.length / 2 - p.height / 2]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(p.height / 2, p.height / 2, p.width + 0.02, 14), hub); w.rotation.x = Math.PI / 2; w.position.x = x; add(w, g); } break; }
+        case "hover": { add(new THREE.Mesh(new THREE.CylinderGeometry(p.radius, p.radius * 0.8, 0.16, 18), hub), g); const gl = new THREE.Mesh(new THREE.CylinderGeometry(p.radius * 0.7, p.radius * 0.7, 0.03, 18), glow); gl.position.y = -0.09; g.add(gl); break; }
+        case "spinner": {
+          const holder = new THREE.Group(); if (p.axis === "horizontal") holder.rotation.x = Math.PI / 2; g.add(holder);
+          const rot = new THREE.Group(); holder.add(rot);
+          if (p.shape === "bar") { add(new THREE.Mesh(new THREE.BoxGeometry(p.radius * 2, 0.12, 0.3), metal), rot); for (const s of [-1, 1]) { const t = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.36), paint); t.position.x = s * (p.radius - 0.12); add(t, rot); } }
+          else if (p.shape === "disc") { add(new THREE.Mesh(new THREE.CylinderGeometry(p.radius, p.radius, 0.1, 28), metal), rot); for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.14), paint); const a = (i / 3) * Math.PI * 2; t.position.set(Math.cos(a) * p.radius, 0, Math.sin(a) * p.radius); add(t, rot); } }
+          else { add(new THREE.Mesh(new THREE.CylinderGeometry(p.radius, p.radius, p.axis === "horizontal" ? 1.0 : 0.6, 20), metal), rot); for (let i = 0; i < 4; i++) { const t = new THREE.Mesh(new THREE.BoxGeometry(0.12, p.axis === "horizontal" ? 1.02 : 0.62, 0.12), paint); const a = (i / 4) * Math.PI * 2; t.position.set(Math.cos(a) * p.radius, 0, Math.sin(a) * p.radius); add(t, rot); } }
+          anim.spin = rot; break;
+        }
+        case "hinge": {
+          const piv = new THREE.Group(); g.add(piv);
+          add(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, Math.max(0.3, p.width), 10), hub), g).rotation.x = Math.PI / 2;
+          if (p.swing === "up") { const m = new THREE.Mesh(new THREE.BoxGeometry(p.length, 0.07, p.width), toy(0xffd166, 0.45)); m.position.x = p.length / 2; add(m, piv); }
+          else { const a = new THREE.Mesh(new THREE.BoxGeometry(0.12, p.length, 0.12), toy(0xb07a4a)); a.position.y = p.length / 2; add(a, piv); const hs = headSize(p); const hd = new THREE.Mesh(new THREE.BoxGeometry(hs, hs, Math.max(0.3, hs * 1.4)), steel); hd.position.y = p.length; add(hd, piv); piv.rotation.z = 0.25; }
+          anim.pivot = piv; anim.swingUp = p.swing === "up"; break;
+        }
+        case "spike": { const m = new THREE.Mesh(new THREE.ConeGeometry(0.07, p.length, 10), metal); m.position.set(p.dir[0] * p.length / 2, p.dir[1] * p.length / 2, p.dir[2] * p.length / 2); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...p.dir)); add(m, g); break; }
+        case "launcher": { const L = launcherLen(p), rr = 0.1 + p.caliber * 0.05; const b = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, L, 14), metal); b.rotation.z = -Math.PI / 2; b.position.x = L / 2; add(b, g); add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.4), hub), g).position.y = -rr; anim.muzzle = new THREE.Object3D(); anim.muzzle.position.x = L; g.add(anim.muzzle); break; }
+        case "battery": { const s = p.size === "large" ? [0.6, 0.3, 0.4] : [0.4, 0.25, 0.3]; add(new THREE.Mesh(new THREE.BoxGeometry(...s), toy(0xffb703, 0.5)), g); const t = new THREE.Mesh(new THREE.BoxGeometry(s[0] + 0.01, s[1] * 0.3, s[2] + 0.01), toy(0x2b1d16)); add(t, g); break; }
+        case "sensor": { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 6), hub); m.position.y = 0.2; add(m, g); const s = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), glow); s.position.y = 0.42; add(s, g); break; }
+      }
+      body.add(g);
+      byId.set(p.id || p, { g, anim, p });
+    }
+    return { group, body, byId };
+  }
+  function disposeGroup(g) { g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose()); }); }
+
+  let scene, camera, sun, arenaGroup, pedestal;
+  const thumb = (() => {
+    if (!renderer) return () => "";
+    let r; try { r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); } catch (e) { return () => ""; }
+    r.setPixelRatio(1); r.setSize(240, 180); r.outputEncoding = THREE.sRGBEncoding;
+    const s = new THREE.Scene(); s.background = lin(0xfde6d2);
+    s.add(new THREE.HemisphereLight(lin(0xfff4e0), lin(0xd07a40), 0.9));
+    const d = new THREE.DirectionalLight(0xffffff, 0.9); d.position.set(3, 6, 5); s.add(d);
+    const cam = new THREE.PerspectiveCamera(30, 4 / 3, 0.1, 60);
+    return (design) => {
+      const R = buildRobot(design); s.add(R.group);
+      const st = derive(design.parts), span = Math.max(2.4, st.maxX - st.minX, st.maxZ - st.minZ, st.top * 1.3);
+      cam.position.set(span * 1.9, span * 1.35, span * 2.4); cam.lookAt(0, st.top * 0.4, 0);
+      r.render(s, cam); const url = r.domElement.toDataURL("image/png");
+      s.remove(R.group); disposeGroup(R.group); return url;
+    };
+  })();
+
+  if (renderer) {
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    stage.prepend(renderer.domElement);
+    scene = new THREE.Scene(); scene.background = lin(0xf3a462);
+    camera = new THREE.PerspectiveCamera(34, 1, 0.1, 300);
+    scene.add(new THREE.HemisphereLight(lin(0xfff4e0), lin(0xd07a40), 0.75));
+    sun = new THREE.DirectionalLight(lin(0xfff1dc), 0.95); sun.position.set(-8, 20, 10); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 60 }); sun.shadow.bias = -0.0008;
+    scene.add(sun);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), toy(0xf3a462, 1, 0)); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+    // arena: floor disc and low toy wall
+    arenaGroup = new THREE.Group(); scene.add(arenaGroup);
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(ARENA, ARENA, 0.1, 64), toy(0xffc98f, 0.9)); floor.position.y = -0.04; floor.receiveShadow = true; arenaGroup.add(floor);
+    for (let i = 0; i < 36; i++) { const a = (i / 36) * Math.PI * 2; const m = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.6, 0.4), toy(i % 2 ? 0xffffff : 0xff5a36)); m.position.set(Math.cos(a) * (ARENA + 0.2), 0.3, Math.sin(a) * (ARENA + 0.2)); m.rotation.y = -a + Math.PI / 2; m.castShadow = true; arenaGroup.add(m); }
+    pedestal = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.25, 48), toy(0xffffff, 0.6)); pedestal.position.y = -0.12; pedestal.receiveShadow = true; scene.add(pedestal);
+    new ResizeObserver(() => { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }).observe(stage);
+  }
+
+  // particles
+  const sparks = [];
+  let sparkGeo, sparkMat;
+  if (renderer) { sparkGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08); sparkMat = [toy(0xffd166, 0.5, 0, { emissive: 0xffb703, emissiveIntensity: 0.6 }), toy(0xffffff)]; }
+  function burst(x, y, z, n = 12) { if (!renderer) return; for (let i = 0; i < n; i++) { const m = new THREE.Mesh(sparkGeo, sparkMat[i % 2]); m.position.set(x, y, z); scene.add(m); const a = Math.random() * 6.28, s = 2 + Math.random() * 5; sparks.push({ m, vx: Math.cos(a) * s, vy: 2 + Math.random() * 5, vz: Math.sin(a) * s, life: 0.6 + Math.random() * 0.4 }); } }
+  const flying = [];
+
+  /* ===================== VIEW STATE ===================== */
+  let view = "garage", garageBot = null, fightView = null, orbit = 0.6, dragX = null;
+  if (renderer) {
+    const c = renderer.domElement;
+    c.addEventListener("pointerdown", (e) => { dragX = e.clientX; c.setPointerCapture(e.pointerId); });
+    c.addEventListener("pointermove", (e) => { if (dragX !== null) { orbit -= (e.clientX - dragX) * 0.008; dragX = e.clientX; } });
+    c.addEventListener("pointerup", () => (dragX = null));
+  }
+  function showGarage(design) {
+    if (!renderer) return;
+    clearFight();
+    view = "garage";
+    $("viewGarage").setAttribute("aria-pressed", "true");
+    $("garageHud").hidden = false; $("fightHud").hidden = true; $("banner").textContent = ""; $("ticker").innerHTML = "";
+    arenaGroup.visible = false; pedestal.visible = true;
+    if (garageBot) { scene.remove(garageBot.group); disposeGroup(garageBot.group); garageBot = null; }
+    if (!design) return;
+    garageBot = buildRobot(design);
+    scene.add(garageBot.group);
+    $("garageLabel").textContent = `WORKSHOP · ${design.name}`;
+  }
+  function clearFight() {
+    if (fightView) { for (const f of fightView.bots) { scene.remove(f.R.group); disposeGroup(f.R.group); } fightView = null; }
+    for (const s of flying) scene.remove(s.m); flying.length = 0;
+  }
+  function startReplay(design, oppIndex, seed) {
+    if (!renderer) return;
+    if (garageBot) { scene.remove(garageBot.group); disposeGroup(garageBot.group); garageBot = null; }
+    clearFight();
+    view = "fight";
+    $("viewGarage").setAttribute("aria-pressed", "false");
+    $("garageHud").hidden = true; $("fightHud").hidden = false; $("ticker").innerHTML = ""; $("banner").textContent = "";
+    arenaGroup.visible = true; pedestal.visible = false;
+    const opp = OPPONENTS[oppIndex];
+    const F = createFight(design, opp, seed);
+    const bots = [F.a, F.b].map((f) => { const R = buildRobot({ ...f.d, parts: f.parts }); scene.add(R.group); return { f, R, flipAnim: 0 }; });
+    // map sim part ids to meshes (buildRobot keyed by part object; re-key by id)
+    for (const b of bots) { const m = new Map(); b.f.parts.forEach((p) => { const e = b.R.byId.get(p.id) || b.R.byId.get(p); if (e) m.set(p.id, e); }); b.map = m; }
+    $("fbA").textContent = design.name; $("fbB").textContent = opp.name;
+    fightView = { F, bots, acc: 0, seenEvents: [0, 0], endShown: false, oppIndex };
+  }
+  function tickerAdd(text, color) {
+    const d = document.createElement("div"); d.className = "tick"; d.innerHTML = text; if (color) d.style.borderLeft = `5px solid ${color}`;
+    const t = $("ticker"); t.prepend(d); while (t.children.length > 4) t.lastChild.remove();
+    setTimeout(() => d.remove(), 5000);
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (renderer) {
+      if (!dragX) orbit += dt * 0.15;
+      if (view === "garage") {
+        const R = 8.5;
+        camera.position.set(Math.sin(orbit) * R, 4.2, Math.cos(orbit) * R); camera.lookAt(0, 0.7, 0);
+        if (garageBot) for (const e of garageBot.byId.values()) if (e.anim.spin) e.anim.spin.rotation.y += dt * 6;
+      } else if (fightView) {
+        const V = fightView, F = V.F;
+        V.acc += dt;
+        while (V.acc >= DT && !F.over) { F.step(); V.acc -= DT; }
+        // sync
+        for (const b of V.bots) {
+          const f = b.f;
+          b.R.group.position.set(f.x, 0, f.z); b.R.group.rotation.y = f.h;
+          b.flipAnim += ((f.flipped ? 1 : 0) - b.flipAnim) * Math.min(1, dt * 6);
+          b.R.body.rotation.x = b.flipAnim * Math.PI; b.R.body.position.y = Math.sin(b.flipAnim * Math.PI) * 1.5 + b.flipAnim * (f.st.top);
+          for (const e of b.map.values()) {
+            if (e.anim.spin) e.anim.spin.rotation.y += dt * 18;
+            if (e.anim.wheel) e.anim.wheel.rotation.z -= f.v * dt * 2;
+            if (e.anim.pivot) { const s = f.swing.get(e.p.id) || 0; const k = s > 0.6 ? (1 - s) / 0.4 : s / 0.6; e.anim.pivot.rotation.z = e.anim.swingUp ? k * 1.1 : 0.25 - k * 1.7; }
+          }
+        }
+        for (const ev of F.fx) {
+          const b = V.bots.find((x) => x.f === ev.who);
+          if (!b) continue;
+          if (ev.type === "hit") burst(b.f.x, 0.8, b.f.z, ev.cause === "recoil" ? 4 : 10);
+          if (ev.type === "detach") {
+            const e = b.map.get(ev.part);
+            if (e) {
+              const wp = new THREE.Vector3(); e.g.getWorldPosition(wp); const wq = new THREE.Quaternion(); e.g.getWorldQuaternion(wq);
+              b.R.body.remove(e.g); e.g.position.copy(wp); e.g.quaternion.copy(wq); scene.add(e.g);
+              const a = Math.random() * 6.28; flying.push({ m: e.g, vx: Math.cos(a) * 4, vy: 6, vz: Math.sin(a) * 4, rs: 6 });
+              b.map.delete(ev.part);
+            }
+          }
+          if (ev.type === "flip") tickerAdd(`<b>${esc(b.f.d.name)}</b> got flipped!`, b.f.d.color);
+          if (ev.type === "shot") { const o = V.bots.find((x) => x.f === ev.to); if (o) burst(o.f.x, 1, o.f.z, 5); }
+        }
+        F.fx.length = 0;
+        for (let i = 0; i < 2; i++) { const f = V.bots[i].f; while (V.seenEvents[i] < f.events.length) { const e = f.events[V.seenEvents[i]++]; if (!/got flipped/.test(e.text)) tickerAdd(`<b>${esc(f.d.name)}</b> ${esc(e.text)}`, f.d.color); } }
+        const hp = (f) => clamp(f.st.blockHp / f.blockHp0, 0, 1) * 100;
+        $("fbAhp").style.width = hp(F.a) + "%"; $("fbBhp").style.width = hp(F.b) + "%";
+        $("fbT").textContent = Math.max(0, Math.ceil(FIGHT_TIME - F.t));
+        if (F.over && !V.endShown) { V.endShown = true; $("banner").textContent = F.winner === F.a ? `${F.a.d.name} WINS` : F.winner === F.b ? `${F.b.d.name} WINS` : "DRAW"; }
+        const cx = (V.bots[0].f.x + V.bots[1].f.x) / 2, cz = (V.bots[0].f.z + V.bots[1].f.z) / 2;
+        camera.position.set(cx * 0.5 + Math.sin(orbit) * 17, 12, cz * 0.5 + Math.cos(orbit) * 17); camera.lookAt(cx * 0.6, 0, cz * 0.6);
+      }
+      for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.life -= dt; s.vy -= 20 * dt; s.m.position.x += s.vx * dt; s.m.position.y = Math.max(0.05, s.m.position.y + s.vy * dt); s.m.position.z += s.vz * dt; if (s.life <= 0) { scene.remove(s.m); sparks.splice(i, 1); } }
+      for (const s of flying) { if (s.rest) continue; s.vy -= 20 * dt; s.m.position.x += s.vx * dt; s.m.position.y += s.vy * dt; s.m.position.z += s.vz * dt; s.m.rotation.x += s.rs * dt; if (s.m.position.y < 0.2) { s.m.position.y = 0.2; s.vy *= -0.3; s.vx *= 0.5; s.vz *= 0.5; s.rs *= 0.5; if (Math.abs(s.vy) < 1) s.rest = true; } }
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  /* ===================== LAB STATE + UI ===================== */
+  const lab = { versions: [], selected: -1, busy: false, example: true, sample: null, demo: true, ctl: null };
+  const CHIPS = ["Build something that can't be flipped.", "Be the fastest bot in the arena.", "Win with one giant weapon.", "Cheap, tough and annoying.", "Fight from a distance.", "Surprise me."];
+  $("chips").innerHTML = CHIPS.map((c) => `<button class="chip" type="button">${esc(c)}</button>`).join("");
+  $("chips").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) $("instr").value = b.textContent; });
+  $("opps").innerHTML = OPPONENTS.map((o) => `<span class="opp"><img src="${thumb(o)}" alt=""><span><b>${o.name}</b><br>${esc(o.idea)}</span></span>`).join("");
+
+  function addVersion(design, notes, source) {
+    design.parts.forEach((p) => (p.id = p.id || Math.random().toString(36).slice(2)));
+    const n = lab.versions.length + 1;
+    const st = derive(design.parts);
+    const v = { n, design, notes, st, source, allNotes: [...notes, ...st.notes] };
+    v.results = gauntlet(design, n);
+    v.thumb = thumb(design);
+    lab.versions.push(v);
+    lab.selected = lab.versions.length - 1;
+    render();
+    showGarage(design);
+    return v;
+  }
+
+  function render() {
+    const v = lab.versions[lab.selected];
+    $("designBtn").textContent = lab.busy ? "DESIGNING…" : lab.example || !lab.versions.length ? "DESIGN V1" : `EVOLVE → V${lab.versions.length + 1}`;
+    $("designBtn").disabled = lab.busy;
+    $("stopBtn").hidden = !lab.busy || lab.demo;
+    $("restartBtn").disabled = lab.busy;
+    $("replayBtn").disabled = !v;
+    if (!v) return;
+    const d = v.design, st = v.st;
+    $("dTitle").textContent = `${lab.example ? "Example · " : ""}Version ${v.n}${v.source === "claude" ? " · designed by Claude" : v.source === "demo" ? " · demo designer" : ""}`;
+    $("dName").textContent = d.name; $("dName").style.color = d.color;
+    $("dIdea").textContent = d.idea;
+    $("dReasonTxt").textContent = d.reasoning || "—";
+    const stat = (k, val) => `<div><dt>${k}</dt><dd>${val}</dd></div>`;
+    $("dStats").innerHTML = stat("Scrap", `${r1(d.spent)}/${BUDGET}`) + stat("Weight", r1(st.mass)) + stat("Health", Math.round(st.hp))
+      + stat("Speed", r1(st.speed)) + stat("Power", `${r1(st.draw)}/${st.capacity}`) + stat("Flip resist", st.flipResist)
+      + stat("Weapons", st.weapons.length ? st.weapons.map((w) => w.kind).join(", ") : st.spikes ? "spikes" : "none") + stat("Front edge", `${Math.round(st.frontLow * 100)} cm`) + stat("Tactics", d.tactics.approach);
+    $("budgetBar").style.width = clamp(d.spent / BUDGET, 0, 1) * 100 + "%"; $("budgetTxt").textContent = `${r1(d.spent)} / ${BUDGET} scrap`;
+    $("dNotes").innerHTML = v.allNotes.map((n) => `<li class="${n.k}">${esc(n.t)}</li>`).join("") || "<li>No problems found.</li>";
+    const counts = {};
+    d.parts.forEach((p) => { const k = label(p).replace(/^(front |rear )?(left |right )?/, ""); counts[k] = (counts[k] || 0) + 1; });
+    $("dParts").innerHTML = Object.entries(counts).map(([k, c]) => `<span>${c}× ${esc(k)}</span>`).join("");
+    $("dRaw").textContent = JSON.stringify({ name: d.name, tactics: d.tactics, parts: d.parts.map(({ cost, id, ...p }) => p) }, null, 1);
+    $("tests").innerHTML = v.results.map((r, i) => `<div class="test"><span class="test-h">vs ${r.opp} <span class="res ${r.res}">${r.res === "W" ? "WIN" : r.res === "L" ? "LOSS" : "DRAW"}</span></span><button class="ctl" type="button" data-replay="${i}">WATCH</button><ul>${r.lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>`).join("");
+    $("reportTxt").textContent = reportText(v);
+    $("timeline").innerHTML = lab.versions.map((x, i) => `<button class="ver ${i === lab.selected ? "sel" : ""}" type="button" data-v="${i}"><img src="${x.thumb}" alt=""><b style="color:${x.design.color}">v${x.n} ${esc(x.design.name)}</b><span class="rec">${x.results.map((r) => `<i class="${r.res}">${r.res}</i>`).join("")}</span><small>${esc(x.design.idea).slice(0, 70)}</small><span class="src">${x.source === "claude" ? "CLAUDE" : x.source === "demo" ? "DEMO DESIGNER" : "EXAMPLE"}</span></button>`).join("");
+    $("timelineNote").textContent = lab.example ? "This is an example so the page isn't empty. Press Design v1 to start your own agent." : `${lab.versions.length} version${lab.versions.length > 1 ? "s" : ""}. Click one to inspect it.`;
+  }
+  $("tests").addEventListener("click", (e) => { const b = e.target.closest("[data-replay]"); if (!b) return; const v = lab.versions[lab.selected]; startReplay(v.design, +b.dataset.replay, v.results[+b.dataset.replay].seed); stage.scrollIntoView({ behavior: "smooth", block: "nearest" }); });
+  $("timeline").addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (!b) return; lab.selected = +b.dataset.v; render(); showGarage(lab.versions[lab.selected].design); });
+  $("viewGarage").addEventListener("click", () => { const v = lab.versions[lab.selected]; if (v) showGarage(v.design); });
+  $("replayBtn").addEventListener("click", () => { const v = lab.versions[lab.selected]; if (!v) return; const i = Math.max(0, v.results.findIndex((r) => r.res !== "W")); startReplay(v.design, i, v.results[i].seed); });
+  $("restartBtn").addEventListener("click", () => { lab.versions = []; lab.selected = -1; lab.example = false; setStatus(""); render(); showGarage(null); $("dName").textContent = ""; $("dIdea").textContent = ""; $("dReasonTxt").textContent = ""; $("dStats").innerHTML = ""; $("dNotes").innerHTML = ""; $("dParts").innerHTML = ""; $("tests").innerHTML = ""; $("timeline").innerHTML = ""; $("timelineNote").textContent = "Give your agent an instruction and press Design v1."; $("dTitle").textContent = "Design"; });
+
+  function setStatus(t, err) { $("status").textContent = t; $("status").className = "status" + (err ? " err" : ""); }
+  const ERR = {
+    rate_limited: "Too many requests right now. Wait a moment, then try again.",
+    session_expired: "Your Claude session expired. Sign in again, then try again.",
+    refused: "Claude declined that request. Try a different instruction.",
+    empty_completion: "Claude didn't return a design. Try again.",
+    invalid_json: "Claude's reply wasn't a readable design. Try again.",
+    prompt_too_large: "The design history got too long. Start a new agent.",
+    upstream_error: "The connection to Claude dropped. Try again.",
+  };
+
+  async function designNext() {
+    if (lab.busy) return;
+    if (lab.example) { lab.versions = []; lab.selected = -1; lab.example = false; }
+    const name = ($("agentName").value.trim() || "AGENT").slice(0, 20), instr = ($("instr").value.trim() || "Surprise me.").slice(0, 240);
+    lab.busy = true; render();
+    $("stream").hidden = true; $("stream").textContent = "";
+    try {
+      let raw, source;
+      if (!lab.demo && lab.sample) {
+        setStatus(`${name} is thinking about version ${lab.versions.length + 1}… (usually 20–60 s)`);
+        lab.ctl = new AbortController();
+        raw = await lab.sample.json(buildPrompt(name, instr, lab.versions), {
+          signal: lab.ctl.signal, cache: false, modelTier: "default",
+          onText: ({ text }) => { $("stream").hidden = false; $("stream").textContent = text.slice(-1500); $("stream").scrollTop = 1e6; setStatus(`${name} is writing the design… (${text.length} characters)`); },
+        });
+        source = "claude";
+      } else {
+        setStatus(`Demo designer is building version ${lab.versions.length + 1}…`);
+        await new Promise((r) => setTimeout(r, 500));
+        raw = demoDesigner(name, instr, lab.versions, mulberry32(Date.now() & 0xffff));
+        source = "demo";
+      }
+      const { design, notes } = sanitize(raw);
+      if (!design.parts.length) throw { code: "empty_design" };
+      const v = addVersion(design, notes, source);
+      const w = v.results.filter((r) => r.res === "W").length;
+      setStatus(`Version ${v.n} built and tested: ${w} win${w === 1 ? "" : "s"} out of 3. ${lab.demo ? "" : "Press Evolve for the next version."}`);
+      const i = Math.max(0, v.results.findIndex((r) => r.res !== "W"));
+      setTimeout(() => startReplay(v.design, i, v.results[i].seed), 600);
+    } catch (e) {
+      const code = e && e.code;
+      if (code === "cancelled") setStatus("Stopped.");
+      else if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(code)) { lab.demo = true; setMode(); setStatus("Claude isn't allowed in this view, so the demo designer takes over. Press Design again.", true); }
+      else if (code === "empty_design") setStatus("That design had no usable parts. Try again.", true);
+      else setStatus(ERR[code] || "Something went wrong. Try again.", true);
+    } finally {
+      lab.busy = false; lab.ctl = null; render();
+    }
+  }
+  $("designBtn").addEventListener("click", designNext);
+  $("stopBtn").addEventListener("click", () => lab.ctl && lab.ctl.abort());
+
+  function setMode() {
+    const m = $("modeLine");
+    if (!lab.demo) { m.className = "mode claude"; m.textContent = "Claude is the designer. Each version is one request on your Claude account and takes about 20–60 seconds."; }
+    else { m.className = "mode"; m.textContent = "Demo designer: Claude can't be reached in this view, so a simple scripted designer stands in. Open this page on claude.ai to have Claude design."; }
+  }
+
+  // Example lineage so the page opens in a working state.
+  (() => {
+    const rng = mulberry32(7);
+    for (let i = 0; i < 2; i++) { const { design, notes } = sanitize(demoDesigner("EXAMPLE", "Build something that can't be flipped.", lab.versions, rng)); addVersion(design, notes, "example"); }
+    lab.example = true; render();
+  })();
+
+  (async () => {
+    try { lab.sample = window.claude && window.claude.use ? await window.claude.use("sample") : null; } catch (e) { lab.sample = null; }
+    lab.demo = !lab.sample;
+    setMode(); render();
+  })();
+})();
+</script>
