@@ -133,6 +133,18 @@
   .kv dd { margin: 0; font-family: var(--mono); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
   .build { font-family: var(--mono); font-size: 13px; font-weight: 500; }
   .thinking { margin: 0; font-size: 14px; font-weight: 700; border-left: 4px solid var(--gold); padding-left: 10px; }
+  .brainbox { background: #efe6ff; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .brain-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .brain-h b { font-family: var(--display); font-weight: 400; font-size: 18px; color: #4b2a94; }
+  .brain-h span { font-family: var(--mono); font-size: 11px; font-weight: 700; color: #6b4bb3; }
+  .brain-note { margin: 0; font-size: 13px; color: #3d1f80; }
+  .brain-rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font: 500 12px/1.35 var(--mono); }
+  .brain-rules li { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 3px 6px; border-radius: 6px; background: rgba(255,255,255,0.6); }
+  .brain-rules li.now { background: #4b2a94; color: #fff; }
+  .brain-rules li small { font-variant-numeric: tabular-nums; opacity: 0.75; }
+  .brain-plan { font: 500 12px/1.6 var(--mono); }
+  .brain-plan s { opacity: 0.55; }
+  .brain-plan b { background: #ffd166; border-radius: 4px; padding: 0 4px; }
   .evo { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
   .evo figure { margin: 0; flex: none; width: 108px; display: flex; flex-direction: column; gap: 4px; }
   .evo img { width: 108px; height: 81px; border-radius: 10px; background: var(--panel-2); display: block; }
@@ -270,6 +282,7 @@
       </dl>
       <div class="build" id="fBuild"></div>
       <p class="thinking" id="fThought"></p>
+      <div class="brainbox" id="fBrain"></div>
       <h2>Evolution this round</h2>
       <div class="evo" id="fEvo"></div>
     </section>
@@ -820,7 +833,9 @@
     g.font = "800 22px 'Nunito', 'Segoe UI', sans-serif"; g.fillStyle = "#2b1d16"; g.textBaseline = "middle";
     g.fillText(b.name, 48, 23);
     g.font = "700 17px 'JetBrains Mono', monospace"; g.fillStyle = "#8a6a58"; g.textAlign = "right";
-    g.fillText("v" + b.gen, 232, 23); g.textAlign = "left";
+    if (b.external) { g.fillStyle = "#7b3fe4"; g.fillText(b.brain ? "brain v" + (b.brain.version || "?") : "no brain", 232, 23); }
+    else g.fillText("v" + b.gen, 232, 23);
+    g.textAlign = "left";
     const r = clamp(b.hp / b.maxHp, 0, 1);
     g.fillStyle = "#f1dcc8"; roundRect(g, 24, 38, 208, 9, 4); g.fill();
     if (r > 0) { g.fillStyle = r > 0.5 ? "#22a867" : r > 0.25 ? "#ffb703" : "#e2402c"; roundRect(g, 24, 38, Math.max(9, 208 * r), 9, 4); g.fill(); }
@@ -1884,7 +1899,7 @@
       if (r.imgSrc !== img) { r.img.src = img; r.imgSrc = img; }
       r.ver.textContent = "v" + b.gen;
       const status = b.alive ? describe(b.spec) : S.mode === "rush" ? `Wrecked · back in ${Math.max(0, Math.ceil(b.respawnT))} s` : b.killedBy ? `Wrecked by ${b.killedBy.name}` : "Caught by the zone";
-      r.sub.textContent = (b.external ? "AGENT · " : "") + status;
+      r.sub.textContent = (b.external ? `AGENT · ${b.brain ? "brain v" + (b.brain.version || "?") : "default brain"} · ` : "") + status;
       r.bar.style.width = f * 100 + "%";
       r.bar.style.background = f > 0.5 ? "var(--good)" : f > 0.25 ? "var(--gold)" : "var(--bad)";
       r.k.textContent = S.mode === "rush" ? `${b.cps} ◆ · ${b.kills} wr` : `${b.kills} wreck${b.kills === 1 ? "" : "s"}`;
@@ -1941,6 +1956,31 @@
     const key = round + ":" + b.id + ":" + b.history.length;
     if (force || key !== lastEvoKey) { lastEvoKey = key; $("fEvo").innerHTML = b.history.map((h) => `<figure><img src="${h.img}" alt="${esc(b.name)} version ${h.gen}"><figcaption><b>v${h.gen}</b> ${esc(h.reason)}</figcaption></figure>`).join(""); $("fEvo").scrollLeft = 1e5; }
     ui.sponsorName.textContent = b.name;
+    renderBrainBox(b);
+  }
+
+  let lastBrainKey = "";
+  function renderBrainBox(b) {
+    const box = $("fBrain");
+    const hits = b.ruleHits || {};
+    const key = [b.id, round, b.external, b.brain && b.brain.version, b.brain && b.brain.key, b.lastRule, b.planIdx, JSON.stringify(hits)].join("|");
+    if (key === lastBrainKey) return;
+    lastBrainKey = key;
+    const dial = (v) => (Math.round(v * 100) / 100).toFixed(2);
+    if (!b.brain) {
+      const who = b.external ? `Default template: ${esc(b.name)} hasn't sent a brain, so it runs the house brain with neutral dials.` : "House brain (scripted), the same rules every house bot uses.";
+      box.innerHTML = `<div class="brain-h"><b>${b.external ? "Default brain" : "House brain"}</b><span>SCRIPTED</span></div><p class="brain-note">${who}</p>
+        <p class="brain-note">Personality: aggression ${dial(b.aggr)} · caution ${dial(b.caution)} · greed ${dial(b.greed)} · build urge ${dial(b.build)} · hunts ${esc(b.mode)} · favourite weapon ${esc(b.pref || "random")}</p>`;
+      return;
+    }
+    const br = b.brain;
+    const rules = br.rules.map((r) => `<li class="${r.n === b.lastRule ? "now" : ""}"><span>${r.n}. if ${esc(r.src)} → ${esc(r.act)}${r.act === "hunt" ? " " + esc(r.target) : ""}</span><small>${hits[r.n] || 0}×</small></li>`).join("");
+    const plan = br.plan.map((p, i) => (i < b.planIdx - 1 ? `<s>${esc(p)}</s>` : i === b.planIdx - 1 ? `<s>${esc(p)}</s>` : i === b.planIdx ? `<b>${esc(p)}</b>` : esc(p))).join(" → ") || "none (the game picks upgrades)";
+    box.innerHTML = `<div class="brain-h"><b>Brain v${esc(br.version || "?")}</b><span>WRITTEN BY ${esc(b.name)} · CHECKS EVERY ${br.tick}s</span></div>
+      ${br.note ? `<p class="brain-note">${esc(br.note)}</p>` : ""}
+      <ol class="brain-rules">${rules}</ol>
+      <div class="brain-plan">Build plan: ${plan}</div>
+      ${br.errors.length ? `<p class="brain-note">Problems: ${esc(br.errors.join("; "))}</p>` : ""}`;
   }
 
   function select(id, follow) { selected = id; if (follow) setFollow(true); renderCard(true); renderStandings(false); }
@@ -2034,6 +2074,7 @@
     if (big !== lastCenter) { lastCenter = big; ui.centerBig.textContent = big; ui.centerBig.classList.remove("bump"); void ui.centerBig.offsetWidth; if (big) ui.centerBig.classList.add("bump"); }
     if (S.waiting) line = `Waiting for ${S.waiting.names.filter((n) => !S.waiting.got.has(n)).join(", ")}'s orders · turn ${S.turnN} · ${Math.max(0, Math.ceil((90000 - (performance.now() - S.waiting.since)) / 1000))} s`;
     ui.centerLine.textContent = line; ui.centerLine.hidden = !line;
+    refreshAgentNote();
     const b = selected !== null ? S.bots[selected] : null;
     ui.sponsorBtn.disabled = sponsorCd > 0 || !b || !b.alive || S.phase !== "fight";
     ui.sponsorText.textContent = sponsorCd > 0 ? `CRATE READY IN ${Math.ceil(sponsorCd)}s ·` : "DROP CRATE ON";
@@ -2244,6 +2285,7 @@
     b.brain = br && br.rules.length ? br : null;
     b.planIdx = 0; b.ruleHits = {}; b.goalTime = {}; b.deathLog = []; b.capLog = []; b.buildLog = [];
     if (b.brain && b.brain.rulePrefs) b.rulePrefs = b.brain.rulePrefs;
+    if (b.label) drawLabel(b);
   }
 
   function botBrief(o, me) {
@@ -2284,7 +2326,7 @@
     if (timedOut) S.waiting.names.filter((n) => !S.waiting.got.has(n)).forEach((n) => { const b = S.bots.find((x) => x.name === n); if (b) feed(b, "didn't answer in time; its autopilot keeps driving.", "agent"); });
     S.waiting = null; S.turnT = turnLength();
   }
-  function agentNote(t) { $("agentNote").textContent = t; }
+  function agentNote(t) { const el = $("agentNote"); if (el.textContent !== t) el.textContent = t; }
   function refreshAgentNote() {
     const names = Object.keys(extSeats);
     agentNote(!mbox ? "The mailbox isn't available in this view, so outside agents can't join here." : names.length ? `Outside agents seated: ${names.join(", ")}. ${S && S.bots.some((b) => b.external) ? "Playing this round." : "Joining the next lobby."}` : "No outside agents yet. An agent joins by writing seats/<NAME> through the mailbox.");
