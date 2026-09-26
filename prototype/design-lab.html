@@ -531,12 +531,12 @@
   ].map((o) => { const s = sanitize(o).design; s.idea = o.idea; return s; });
 
   /* ===================== FIGHT SIMULATION ===================== */
-  const ARENA = 11, FIGHT_TIME = 30, DT = 1 / 60;
+  const ARENA = 26, FIGHT_TIME = 40, DT = 1 / 60;
   function createFight(dA, dB, seed) {
     const rng = mulberry32(seed);
     const mk = (d, side) => {
       const parts = d.parts.map((p) => ({ ...p, pos: p.pos.slice(), hp: partHp(p), maxHp: partHp(p), id: Math.random().toString(36).slice(2) }));
-      const f = { d, parts, st: derive(parts), x: side * 6, z: 0, h: side > 0 ? Math.PI : 0, v: 0, flipped: false, flipT: 0, stuckT: 0, immobileT: 0, stun: 0, cds: new Map(), dealt: 0, taken: 0, flipsDone: 0, flipsTaken: 0, selfRights: 0, lost: [], events: [], ko: null, mode: 0, modeT: 0, reached: false, selfHits: 0, maxV: 0, swing: new Map() };
+      const f = { d, parts, st: derive(parts), x: side * 10, z: side * 4, h: side > 0 ? Math.PI : 0, v: 0, flipped: false, flipT: 0, stuckT: 0, immobileT: 0, stun: 0, cds: new Map(), dealt: 0, taken: 0, flipsDone: 0, flipsTaken: 0, selfRights: 0, lost: [], events: [], ko: null, mode: 0, modeT: 0, reached: false, selfHits: 0, maxV: 0, swing: new Map() };
       f.blockHp0 = f.st.blockHp || 1;
       return f;
     };
@@ -696,7 +696,7 @@
     const me = F.a, op = F.b;
     const res = F.winner === me ? "W" : F.winner === op ? "L" : "D";
     const lines = [];
-    const how = F.winner === me ? (op.ko ? `Won in ${Math.round(F.t)} s: ${op.ko}.` : "Won on damage after 30 s.") : F.winner === op ? (me.ko ? `Lost in ${Math.round(F.t)} s: ${me.ko}.` : "Lost on damage after 30 s.") : "Draw after 30 s.";
+    const how = F.winner === me ? (op.ko ? `Won in ${Math.round(F.t)} s: ${op.ko}.` : `Won on damage after ${FIGHT_TIME} s.`) : F.winner === op ? (me.ko ? `Lost in ${Math.round(F.t)} s: ${me.ko}.` : `Lost on damage after ${FIGHT_TIME} s.`) : `Draw after ${FIGHT_TIME} s.`;
     lines.push(how);
     lines.push(`Dealt ${Math.round(me.dealt)} damage, took ${Math.round(me.taken)}.`);
     if (!me.reached) lines.push("Never landed a hit.");
@@ -745,7 +745,7 @@ PHYSICS (the game simulates this; nothing is scripted):
 
 TACTICS: {"approach":"charge"|"circle"|"ambush"|"hit-and-run","preferredRange":0-9} (use a range of 3+ only for launchers).
 
-TESTS: every version fights three test robots for up to 30 s each: BRICK (heavy steel rammer with front spikes), SNAPPER (low wedge with a strong lifting arm), WHIRL (small body with a huge spinning bar on top).`;
+TESTS: every version fights three test robots for up to 40 s each in a round arena 52 m across; the robots start 20 m apart: BRICK (heavy steel rammer with front spikes), SNAPPER (low wedge with a strong lifting arm), WHIRL (small body with a huge spinning bar on top).`;
 
   function buildPrompt(name, instr, history) {
     const hist = history.slice(-3).map((v) => `VERSION ${v.n} "${v.design.name}" — idea: ${v.design.idea}
@@ -898,14 +898,15 @@ Reply with only a JSON object, no other text:
     scene = new THREE.Scene(); scene.background = lin(0xf3a462);
     camera = new THREE.PerspectiveCamera(34, 1, 0.1, 300);
     scene.add(new THREE.HemisphereLight(lin(0xfff4e0), lin(0xd07a40), 0.75));
-    sun = new THREE.DirectionalLight(lin(0xfff1dc), 0.95); sun.position.set(-8, 20, 10); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 60 }); sun.shadow.bias = -0.0008;
+    sun = new THREE.DirectionalLight(lin(0xfff1dc), 0.95); sun.position.set(-12, 30, 16); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 80 }); sun.shadow.bias = -0.0008;
     scene.add(sun);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), toy(0xf3a462, 1, 0)); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
     // arena: floor disc and low toy wall
     arenaGroup = new THREE.Group(); scene.add(arenaGroup);
     const floor = new THREE.Mesh(new THREE.CylinderGeometry(ARENA, ARENA, 0.1, 64), toy(0xffc98f, 0.9)); floor.position.y = -0.04; floor.receiveShadow = true; arenaGroup.add(floor);
-    for (let i = 0; i < 36; i++) { const a = (i / 36) * Math.PI * 2; const m = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.6, 0.4), toy(i % 2 ? 0xffffff : 0xff5a36)); m.position.set(Math.cos(a) * (ARENA + 0.2), 0.3, Math.sin(a) * (ARENA + 0.2)); m.rotation.y = -a + Math.PI / 2; m.castShadow = true; arenaGroup.add(m); }
+    const SEG = Math.round((Math.PI * 2 * ARENA) / 1.9);
+    for (let i = 0; i < SEG; i++) { const a = (i / SEG) * Math.PI * 2; const m = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.6, 0.4), toy(i % 2 ? 0xffffff : 0xff5a36)); m.position.set(Math.cos(a) * (ARENA + 0.2), 0.3, Math.sin(a) * (ARENA + 0.2)); m.rotation.y = -a + Math.PI / 2; m.castShadow = true; arenaGroup.add(m); }
     pedestal = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 0.25, 48), toy(0xffffff, 0.6)); pedestal.position.y = -0.12; pedestal.receiveShadow = true; scene.add(pedestal);
     new ResizeObserver(() => { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }).observe(stage);
   }
@@ -1012,7 +1013,11 @@ Reply with only a JSON object, no other text:
         $("fbT").textContent = Math.max(0, Math.ceil(FIGHT_TIME - F.t));
         if (F.over && !V.endShown) { V.endShown = true; $("banner").textContent = F.winner === F.a ? `${F.a.d.name} WINS` : F.winner === F.b ? `${F.b.d.name} WINS` : "DRAW"; }
         const cx = (V.bots[0].f.x + V.bots[1].f.x) / 2, cz = (V.bots[0].f.z + V.bots[1].f.z) / 2;
-        camera.position.set(cx * 0.5 + Math.sin(orbit) * 17, 12, cz * 0.5 + Math.cos(orbit) * 17); camera.lookAt(cx * 0.6, 0, cz * 0.6);
+        // frame both robots, pulling back as they spread out
+        const sep = Math.hypot(V.bots[0].f.x - V.bots[1].f.x, V.bots[0].f.z - V.bots[1].f.z);
+        const R = clamp(sep * 1.1 + 12, 16, 48) * (camera.aspect < 1 ? 1.4 : 1);
+        V.camR = V.camR ? V.camR + (R - V.camR) * Math.min(1, dt * 2) : R;
+        camera.position.set(cx + Math.sin(orbit) * V.camR, V.camR * 0.62, cz + Math.cos(orbit) * V.camR); camera.lookAt(cx, 0, cz);
       }
       for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.life -= dt; s.vy -= 20 * dt; s.m.position.x += s.vx * dt; s.m.position.y = Math.max(0.05, s.m.position.y + s.vy * dt); s.m.position.z += s.vz * dt; if (s.life <= 0) { scene.remove(s.m); sparks.splice(i, 1); } }
       for (const s of flying) { if (s.rest) continue; s.vy -= 20 * dt; s.m.position.x += s.vx * dt; s.m.position.y += s.vy * dt; s.m.position.z += s.vz * dt; s.m.rotation.x += s.rs * dt; if (s.m.position.y < 0.2) { s.m.position.y = 0.2; s.vy *= -0.3; s.vx *= 0.5; s.vz *= 0.5; s.rs *= 0.5; if (Math.abs(s.vy) < 1) s.rest = true; } }

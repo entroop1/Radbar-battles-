@@ -362,7 +362,7 @@
   }
 
   /* ================= WORLD ================= */
-  const WORLD = 130; // ~10x the area of the first version
+  const WORLD = 260; // ~40x the area of the first version: room to explore
   const obstacles = [];
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), toy(GROUND, 1, 0));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
@@ -390,7 +390,7 @@
     return null;
   };
   (() => {
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < 150; i++) {
       const spot = freeSpot(26, WORLD - 8, 8); if (!spot) continue;
       const [x, z] = spot, kind = i % 3, col = BLOCK_COLORS[i % BLOCK_COLORS.length];
       if (kind === 0) {
@@ -411,7 +411,7 @@
     }
     // lollipop trees in little groves
     const trunk = toy(0xb07a4a), leaves = [toy(0x4fd18b), toy(0x3aa655), toy(0x9be22d)];
-    for (let g = 0; g < 12; g++) {
+    for (let g = 0; g < 40; g++) {
       const spot = freeSpot(30, WORLD - 10, 10); if (!spot) continue;
       for (let i = 0; i < 5; i++) {
         const x = spot[0] + rand(-6, 6), z = spot[1] + rand(-6, 6);
@@ -547,9 +547,9 @@
     word("SCRAP", -4); word("ROYALE", 4);
     const pinSet = (cx, cz) => { let k = 0; for (let row = 0; row < 4; row++) for (let i = 0; i <= row; i++) { addProp("pin", cx + row * 0.75, cz + (i - row / 2) * 0.75); k++; } };
     pinSet(-15, 10); pinSet(14, -9);
-    for (let i = 0; i < 7; i++) { const sp = freeSpot(30, WORLD - 10, 4); if (sp) pinSet(sp[0], sp[1]); }
-    for (let i = 0; i < 45; i++) { const sp = freeSpot(10, WORLD - 5, 1.5); if (sp) addProp("cone", sp[0], sp[1]); }
-    for (let i = 0; i < 30; i++) { const sp = freeSpot(12, WORLD - 5, 1.5); if (sp) addProp("crate", sp[0], sp[1]); }
+    for (let i = 0; i < 22; i++) { const sp = freeSpot(30, WORLD - 10, 4); if (sp) pinSet(sp[0], sp[1]); }
+    for (let i = 0; i < 140; i++) { const sp = freeSpot(10, WORLD - 5, 1.5); if (sp) addProp("cone", sp[0], sp[1]); }
+    for (let i = 0; i < 90; i++) { const sp = freeSpot(12, WORLD - 5, 1.5); if (sp) addProp("crate", sp[0], sp[1]); }
   })();
   function resetProps() {
     for (const p of props) {
@@ -579,9 +579,9 @@
       }
     }
     for (const p of props) p.moving = Math.abs(p.vx) + Math.abs(p.vz) > 0.05 || p.y > 0 || (p.falling && p.fall < 1);
-    for (let i = 0; i < props.length; i++) for (let j = i + 1; j < props.length; j++) {
-      const a = props[i], b = props[j];
-      if (!a.moving && !b.moving) continue;
+    props.forEach((p, i) => (p.idx = i));
+    for (const a of props) for (const b of props) {
+      if (!a.moving || a === b || (b.moving && b.idx < a.idx)) continue;
       const dx = b.x - a.x, dz = b.z - a.z, m = a.r + b.r;
       if (Math.abs(dx) > m || Math.abs(dz) > m) continue;
       const d = Math.hypot(dx, dz);
@@ -858,7 +858,7 @@
 
   /* ================= ROUND STATE ================= */
   let S = null, round = 0, selected = null, following = false, camMode = "action", focusBot = null, focusSince = 0, gameMode = "rush";
-  const RUSH_TIME = 150, CP_COUNT = 5, CP_RADIUS = 3.5, CP_HOLD = 2.5;
+  const RUSH_TIME = 180, CP_COUNT = 8, CP_RADIUS = 3.5, CP_HOLD = 2.5;
   const DECK = [
     { id: "glass", name: "Glass cannons", text: "All damage ×2 for 30 s.", dur: 30 },
     { id: "jam", name: "Cannons jammed", text: "Cannons can't fire for 30 s.", dur: 30 },
@@ -885,7 +885,7 @@
     S = {
       phase: "lobby", t: 0, fightT: 0, bots: [], items: [], shots: [], queue: roster, joinT: 0.4, countT: 0, resT: 0,
       crateT: 8, scrapT: 6, lastThinker: null, winner: null, placements: [], mode: gameMode, cps: [], rules: [], pick: null, pickQueue: [], cpSpawnT: 0,
-      zone: { cx: 0, cz: 0, r: WORLD - 4, phase: "wait", t: 18, n: 0, fromR: WORLD - 4, toR: WORLD - 4, fromX: 0, fromZ: 0, toX: 0, toZ: 0, dur: 7 },
+      zone: { cx: 0, cz: 0, r: WORLD - 4, phase: "wait", t: 32, n: 0, fromR: WORLD - 4, toR: WORLD - 4, fromX: 0, fromZ: 0, toX: 0, toZ: 0, dur: 7 },
     };
     setZoneVisible(false);
     ui.results.hidden = true;
@@ -975,11 +975,11 @@
   function updateZone(dt) {
     const Z = S.zone;
     Z.t -= dt;
-    if (Z.phase === "wait" && Z.t <= 0) { Z.phase = "shrink"; Z.t = Z.dur = 12; feed(null, "The zone is closing in.", "zone"); }
+    if (Z.phase === "wait" && Z.t <= 0) { Z.phase = "shrink"; Z.t = Z.dur = 18; feed(null, "The zone is closing in.", "zone"); }
     else if (Z.phase === "shrink") {
       const p = 1 - clamp(Z.t / Z.dur, 0, 1), e = p * p * (3 - 2 * p);
       Z.r = Z.fromR + (Z.toR - Z.fromR) * e; Z.cx = Z.fromX + (Z.toX - Z.fromX) * e; Z.cz = Z.fromZ + (Z.toZ - Z.fromZ) * e;
-      if (Z.t <= 0) { Z.phase = "wait"; Z.n++; Z.t = Math.max(7, 15 - Z.n * 1.5); planZone(); }
+      if (Z.t <= 0) { Z.phase = "wait"; Z.n++; Z.t = Math.max(9, 20 - Z.n * 2); planZone(); }
     }
     drawZone();
   }
@@ -1068,7 +1068,7 @@
       return { c, d, rivals, score: d * (threat > power(b) * 1.3 && b.caution > 0.5 ? 2.5 : 1) - (b.mode === "opportunist" && rivals.length > 1 ? -15 : 0) };
     }).sort((a, z) => a.score - z.score);
     const best = scored[0];
-    if (best.d > 120) return null;
+    if (best.d > 200) return null;
     // on the checkpoint with rivals: fight for it
     if (best.d < CP_RADIUS + 3 && best.rivals.length) {
       const r = best.rivals.slice().sort((a, z) => a.d - z.d)[0].o;
@@ -1090,7 +1090,7 @@
     const nextMargin = zc.r - Math.hypot(b.x - zc.x, b.z - zc.z);
     const prevGoal = b.goal;
     let goal, text;
-    const early = S.fightT < 6;
+    const early = S.fightT < 20; // opening: explore and scavenge before anyone hunts
     if (margin < 3 || (S.zone.phase === "wait" && S.zone.t < 5 && nextMargin < 2)) {
       goal = { type: "zone" };
       text = margin < 0 ? `I'm outside the zone, losing ${zoneDmg().toFixed(0)} HP a second. Getting back in.` : nextMargin >= 0 ? `Right at the edge of the next circle. Moving ${compass(zc.x - b.x, zc.z - b.z)}, deeper inside.` : `Next circle is ${Math.round(-nextMargin)}m away. Moving ${compass(zc.x - b.x, zc.z - b.z)} before it closes.`;
@@ -1280,7 +1280,7 @@
       if (b.hop) {
         const H = b.hop; H.t += dt;
         const p = clamp(H.t / H.dur, 0, 1);
-        b.x = H.fx + (H.tx - H.fx) * p; b.z = H.fz + (H.tz - H.fz) * p; b.y = Math.sin(p * Math.PI) * 24;
+        b.x = H.fx + (H.tx - H.fx) * p; b.z = H.fz + (H.tz - H.fz) * p; b.y = Math.sin(p * Math.PI) * 40;
         b.h = Math.atan2(-(H.tz - H.fz), H.tx - H.fx);
         if (p >= 1) { b.hop = null; b.y = 0; b.bump = 1.4; puff(b.x, 0.2, b.z, 6, 0xfde2c4, 1.2, 1.2); }
         continue;
@@ -1306,7 +1306,25 @@
           if (b.building <= 0 && b.pendingUpgrade) finishBuild(b);
         } else if (b.thinkT <= 0 && S.t - b.lastThink > 0.5) think(b);
 
-        if (b.stun <= 0 && b.building <= 0) {
+        // stuck against scenery? steer around it for a moment (there's no pathfinding)
+        const gp = g.type === "hunt" && g.target.alive ? g.target : g.type === "item" ? g.item : g.type === "cp" ? g.cp : g.type === "point" ? g : null;
+        b.stuckT = (b.stuckT || 0) + dt;
+        if (b.stuckT > 2) {
+          b.stuckT = 0;
+          if (gp && !b.detour && b.building <= 0) {
+            const d = Math.hypot(gp.x - b.x, gp.z - b.z);
+            if (b.lastGoalD !== undefined && b.lastGoalD - d < 1.5 && d > 5) {
+              const side = Math.random() < 0.5 ? -1 : 1;
+              b.detour = { x: b.x + (-(gp.z - b.z) / d) * 9 * side - ((gp.x - b.x) / d) * 3, z: b.z + ((gp.x - b.x) / d) * 9 * side - ((gp.z - b.z) / d) * 3, t: 1.4 };
+            }
+            b.lastGoalD = d;
+          } else b.lastGoalD = undefined;
+        }
+        if (b.detour && b.stun <= 0 && b.building <= 0) {
+          b.detour.t -= dt;
+          moved = steerTo(b, b.detour.x, b.detour.z, dt, 0.5);
+          if (b.detour.t <= 0 || moved === 0) b.detour = null;
+        } else if (b.stun <= 0 && b.building <= 0) {
           const g2 = b.goal;
           if (g2.type === "hunt" && g2.target.alive) {
             const t = g2.target, d = dist(b, t);
@@ -1329,7 +1347,7 @@
         if (b.cd <= 0 && b.stun <= 0 && b.building <= 0 && b.goal.type !== "flee") {
           let tgt = null;
           if (b.goal.type === "hunt" && b.goal.target.alive && dist(b, b.goal.target) <= b.st.range + b.goal.target.r * 0.5) tgt = b.goal.target;
-          if (!tgt && !b.st.ranged && S.fightT > 6) for (const o of alive) if (o !== b && o.alive && !o.hop && dist(b, o) <= b.st.range + o.r * 0.3) { tgt = o; break; }
+          if (!tgt && !b.st.ranged && S.fightT > 20) for (const o of alive) if (o !== b && o.alive && !o.hop && dist(b, o) <= b.st.range + o.r * 0.3) { tgt = o; break; }
           if (tgt) {
             const facing = Math.abs(wrapA(Math.atan2(-(tgt.z - b.z), tgt.x - b.x) - b.h));
             if (facing < (b.st.ranged ? 0.35 : 1.0) && !(b.st.ranged && ruleOn("jam"))) {
@@ -1400,7 +1418,7 @@
       S.countT -= dt;
       if (S.countT <= 0) {
         S.phase = "fight"; S.fightT = 0;
-        for (let i = 0; i < 300; i++) spawnScrap(null, null, 1);
+        for (let i = 0; i < 900; i++) spawnScrap(null, null, 1);
         if (S.mode === "rush") {
           Object.assign(S.zone, { r: WORLD * 3, toR: WORLD * 3, phase: "off", t: 0 });
           setZoneVisible(false);
@@ -1429,7 +1447,7 @@
         feed(null, `A supply crate is dropping ${compass(Math.cos(a), Math.sin(a))} of the zone center.`, "drop");
       }
       S.scrapT -= dt;
-      if (S.scrapT <= 0) { S.scrapT = 5; for (let i = 0; i < 8; i++) { const a = rand(0, Math.PI * 2), d = rand(0, Math.min(S.zone.r, WORLD - 6) * 0.85); spawnScrap(S.zone.cx + Math.cos(a) * d, S.zone.cz + Math.sin(a) * d, 1); } }
+      if (S.scrapT <= 0) { S.scrapT = 5; for (let i = 0; i < 20; i++) { const a = rand(0, Math.PI * 2), d = rand(0, Math.min(S.zone.r, WORLD - 6) * 0.85); spawnScrap(S.zone.cx + Math.cos(a) * d, S.zone.cz + Math.sin(a) * d, 1); } }
     } else if (S.phase === "results") {
       S.resT -= dt;
       if (S.winner && S.winner.alive && Math.random() < dt * 3) spark(S.winner.x, 3, S.winner.z, 20, [0xff5a36, 0xffd166, 0x6ec6ff, 0x4fd18b, 0xff7eb6, 0x9b7bff], 9, 9);
@@ -1459,7 +1477,7 @@
       const a = off + (i / n) * Math.PI * 2;
       const ring = WORLD * rand(0.45, 0.8); let tx = Math.cos(a) * ring, tz = Math.sin(a) * ring;
       for (const o of obstacles) { const d = Math.hypot(tx - o.x, tz - o.z); if (d < o.r + 2) { tx *= 0.85; tz *= 0.85; } }
-      b.hop = { fx: b.x, fz: b.z, tx, tz, t: -i * 0.06, dur: 2.0 };
+      b.hop = { fx: b.x, fz: b.z, tx, tz, t: -i * 0.06, dur: 2.8 };
     });
   }
 
@@ -1538,7 +1556,7 @@
     let x = 0, z = 0;
     for (let t = 0; t < 60; t++) {
       const a = rand(0, Math.PI * 2), d = rand(18, WORLD - 10); x = Math.cos(a) * d; z = Math.sin(a) * d;
-      if (!obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + CP_RADIUS + 1) && !S.cps.some((c) => Math.hypot(c.x - x, c.z - z) < 40) && !S.bots.some((b) => b.alive && Math.hypot(b.x - x, b.z - z) < 25)) break;
+      if (!obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + CP_RADIUS + 1) && !S.cps.some((c) => Math.hypot(c.x - x, c.z - z) < 70) && !S.bots.some((b) => b.alive && Math.hypot(b.x - x, b.z - z) < 25)) break;
     }
     const g = new THREE.Group(); g.position.set(x, 0, z); g.visible = false;
     const pad = mesh(cpPadGeo, toy(0xffffff, 0.5), 0, 0.06, 0, g); pad.castShadow = false;
