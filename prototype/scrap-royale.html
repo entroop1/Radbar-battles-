@@ -288,7 +288,7 @@
 
   const scene = new THREE.Scene();
   scene.background = lin(GROUND);
-  scene.fog = new THREE.Fog(lin(GROUND), 70, 125);
+  scene.fog = new THREE.Fog(lin(GROUND), 150, 260); // pushed out every frame so it only softens the horizon
   const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 400);
 
   scene.add(new THREE.HemisphereLight(lin(0xfff4e0), lin(0xd07a40), 0.75));
@@ -333,7 +333,7 @@
   /* ================= WORLD ================= */
   const WORLD = 42;
   const obstacles = [];
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), toy(GROUND, 1, 0));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), toy(GROUND, 1, 0));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
   scene.add(ground);
   // painted arena markings
@@ -374,7 +374,7 @@
   })();
 
   /* ================= ZONE VISUALS ================= */
-  const zoneOut = new THREE.Mesh(new THREE.RingGeometry(1, 12, 128, 1), new THREE.MeshBasicMaterial({ color: lin(0x5a2bb8), transparent: true, opacity: 0.4, depthWrite: false }));
+  const zoneOut = new THREE.Mesh(new THREE.RingGeometry(1, 12, 128, 1), new THREE.MeshBasicMaterial({ color: lin(0x5a2bb8), transparent: true, opacity: 0.3, depthWrite: false }));
   zoneOut.rotation.x = -Math.PI / 2; zoneOut.position.y = 0.03; scene.add(zoneOut);
   const zoneWall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 128, 1, true), new THREE.MeshBasicMaterial({ color: lin(0x9b6bff), transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
   zoneWall.scale.y = 2.4; zoneWall.position.y = 1.2; scene.add(zoneWall);
@@ -910,7 +910,14 @@
   }
   function drawZone() {
     const Z = S.zone;
-    zoneOut.scale.set(Z.r, Z.r, 1); zoneOut.position.set(Z.cx, 0.03, Z.cz);
+    // Tint only the arena floor outside the circle, not the horizon.
+    if (Math.abs((zoneOut.userData.r || 0) - Z.r) > 0.05 || zoneOut.userData.cx !== Z.cx || zoneOut.userData.cz !== Z.cz) {
+      const outer = WORLD + 3 + Math.hypot(Z.cx, Z.cz);
+      zoneOut.geometry.dispose();
+      zoneOut.geometry = new THREE.RingGeometry(Math.max(0.01, Z.r), Math.max(Z.r + 0.1, outer), 128, 1);
+      zoneOut.userData = { r: Z.r, cx: Z.cx, cz: Z.cz };
+    }
+    zoneOut.position.set(Z.cx, 0.03, Z.cz);
     zoneWall.scale.set(Z.r, 2.4, Z.r); zoneWall.position.set(Z.cx, 1.2, Z.cz);
     zoneNext.visible = Z.phase === "wait";
     zoneNext.scale.set(Z.toR, Z.toR, 1); zoneNext.position.set(Z.toX, 0.04, Z.toZ);
@@ -1440,6 +1447,9 @@
     if (shake > 0 && !reduced) { camera.position.x += rand(-1, 1) * shake; camera.position.y += rand(-1, 1) * shake; }
     shake = Math.max(0, shake - dt * 2);
     camera.lookAt(lx, 0.5, lz);
+    // Fog starts well past the arena, however far out the camera is.
+    const camDist = Math.hypot(camera.position.x - lx, camera.position.y, camera.position.z - lz);
+    scene.fog.near = camDist + 45; scene.fog.far = camDist + 200;
     sun.position.set(cam.tx - 20, 45, cam.tz + 25); sun.target.position.set(cam.tx, 0, cam.tz);
   }
 
