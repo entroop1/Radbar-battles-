@@ -85,6 +85,19 @@
   .stage .minimap { position: absolute; right: 14px; bottom: 58px; width: 160px; height: 160px; border-radius: 50%; box-shadow: 0 4px 0 rgba(0,0,0,0.14); pointer-events: none; }
   .nogl { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: #fff; font-weight: 800; }
 
+  .rules { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; pointer-events: none; max-width: 46%; }
+  .rule-chip { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; background: var(--zone); color: #fff; padding: 4px 10px; border-radius: 999px; box-shadow: 0 3px 0 rgba(0,0,0,0.14); animation: pop .3s cubic-bezier(.3,1.6,.5,1); }
+  .pick { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); width: min(640px, calc(100% - 28px)); background: #fff; border-radius: 18px; padding: 14px; box-shadow: 0 8px 0 rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 10px; animation: pop .35s cubic-bezier(.3,1.5,.5,1); }
+  .pick-h { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-weight: 800; }
+  .pick-h span { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .card-btn { font: inherit; text-align: left; border: 0; border-radius: 12px; padding: 10px; cursor: pointer; background: #efe6ff; color: var(--ink); display: flex; flex-direction: column; gap: 4px; box-shadow: 0 4px 0 #cdb8f5; }
+  .card-btn:hover { transform: translateY(-2px); }
+  .card-btn:focus-visible { outline: 3px solid var(--zone); outline-offset: 2px; }
+  .card-btn b { font-family: var(--display); font-weight: 400; font-size: 19px; line-height: 1.05; color: #4b2a94; }
+  .card-btn span { font-size: 13px; }
+  .pick-timer { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  .pick-timer div { height: 100%; background: var(--zone); }
   .results { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(43, 29, 22, 0.28); }
   .res-card { background: #fff; border-radius: 18px; padding: 20px; max-width: 540px; width: 100%; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 0 rgba(0,0,0,0.15); animation: pop .4s cubic-bezier(.3,1.5,.5,1); }
   .res-card h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(26px, 5vw, 38px); line-height: 1.05; }
@@ -136,6 +149,8 @@
   .tag.drop-t { background: var(--signal); color: #fff; }
   .tag.zone-t { background: var(--zone); color: #fff; }
   .tag.join-t { background: var(--good); color: #fff; }
+  .tag.cp-t { background: var(--gold); color: #3a2600; }
+  .tag.rule-t { background: #4b2a94; color: #fff; }
 
   .tabs { display: flex; gap: 6px; }
   .tab { font: 700 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; border: 0; background: var(--panel-2); color: var(--ink-soft); border-radius: 999px; padding: 5px 10px; cursor: pointer; }
@@ -175,6 +190,9 @@
     .hint { display: none; }
     .bubble { max-width: 180px; font-size: 12px; }
     .killfeed { top: auto; bottom: 96px; left: 14px; right: auto; align-items: flex-start; max-width: 60%; }
+    .cards { grid-template-columns: 1fr; }
+    .card-btn { flex-direction: row; align-items: baseline; gap: 8px; }
+    .rules { max-width: 60%; top: 120px; }
     .stage .minimap { width: 96px; height: 96px; top: 14px; right: 14px; bottom: auto; }
     .kf:nth-child(n+3) { display: none; }
   }
@@ -184,7 +202,7 @@
 <div class="wrap">
   <header>
     <h1>SCRAP <span>ROYALE</span></h1>
-    <p class="sub">A lobby of 15 AI agents, one sentence of instructions each. Every round they start from a box on wheels, scavenge, rebuild on the fly and fight until one is left.</p>
+    <p class="sub">A lobby of 15 AI agents, one sentence of instructions each. Every round they start from a box on wheels, hunt hidden checkpoints, rebuild on the fly and fight over them. Whoever captures a checkpoint changes the rules.</p>
   </header>
 
   <section class="stage" id="stage" aria-label="Live 3D arena">
@@ -194,6 +212,12 @@
       <span class="pill zone-pill" id="zoneLine" hidden></span>
     </div>
     <div class="killfeed" id="killfeed"></div>
+    <div class="rules" id="rules"></div>
+    <div class="pick" id="pick" hidden>
+      <div class="pick-h"><span style="font-family:var(--body);font-size:15px;color:var(--ink)" id="pickTitle"></span><span id="pickTime"></span></div>
+      <div class="cards" id="pickCards"></div>
+      <div class="pick-timer"><div id="pickBar"></div></div>
+    </div>
     <div class="center" id="center"><div class="huge" id="centerBig"></div><div class="line" id="centerLine"></div></div>
     <div class="bubble" id="bubble" hidden></div>
     <canvas class="minimap" id="minimap" width="320" height="320" aria-label="Minimap"></canvas>
@@ -207,8 +231,9 @@
         <button class="ctl" type="button" data-speed="2" aria-pressed="false">2×</button>
         <button class="ctl" type="button" data-speed="4" aria-pressed="false">4×</button>
       </div>
+      <button class="ctl" id="modeBtn" type="button">MODE: CHECKPOINT RUSH</button>
       <button class="ctl sponsor" id="sponsorBtn" type="button"><span id="sponsorText">DROP CRATE ON</span> <span id="sponsorName"></span></button>
-      <span class="hint">Click a bot to follow it · drag to look around</span>
+      <span class="hint">Follow a bot to back it: when it captures a checkpoint, you pick the rule</span>
     </div>
     <div class="results" id="results" hidden>
       <div class="res-card">
@@ -239,7 +264,7 @@
         <div><dt>HP</dt><dd id="fHp"></dd></div>
         <div><dt>Scrap</dt><dd id="fScrap"></dd></div>
         <div><dt>Wrecks</dt><dd id="fKills"></dd></div>
-        <div><dt>Wins</dt><dd id="fWins"></dd></div>
+        <div><dt>Checkpoints</dt><dd id="fWins"></dd></div>
       </dl>
       <div class="build" id="fBuild"></div>
       <p class="thinking" id="fThought"></p>
@@ -258,7 +283,7 @@
         <button class="tab" role="tab" id="tabSeason" aria-selected="false" type="button">Season</button>
       </div>
       <ol class="standings" id="standings"></ol>
-      <div class="season-wrap" id="seasonWrap" hidden><table class="season"><thead><tr><th>#</th><th>Agent</th><th>PTS</th><th>WINS</th><th>WRECKS</th><th>RDS</th></tr></thead><tbody id="seasonBody"></tbody></table></div>
+      <div class="season-wrap" id="seasonWrap" hidden><table class="season"><thead><tr><th>#</th><th>Agent</th><th>PTS</th><th>WINS</th><th>CPS</th><th>WRECKS</th><th>RDS</th></tr></thead><tbody id="seasonBody"></tbody></table></div>
       <p class="note">Simulated agents. In the real game each bot's decisions would come from a real AI agent every few seconds, with a simple autopilot driving in between.</p>
     </section>
   </div>
@@ -627,9 +652,10 @@
       dmg: Math.round(w.dmg * mult * 0.5 * 10) / 10,
       range: w.range * (spec.weapon === "cannon" ? 1 : 0.9 + 0.1 * sizeScale(spec.size) + 0.05 * spec.wlvl),
       cd: w.cd, knock: w.knock, flip: !!w.flip, ranged: !!w.ranged,
+      scan: 28 + (spec.scanner || 0) * 16,
     };
   }
-  const describe = (spec) => `${CHASSIS[spec.chassis]}${spec.size > 1 ? " L" + spec.size : ""} · ${LOCO[spec.loco].name} · ${WEAPONS[spec.weapon].name}${spec.wlvl > 1 ? " Mk" + spec.wlvl : ""} · Armor ${spec.armor}`;
+  const describe = (spec) => `${CHASSIS[spec.chassis]}${spec.size > 1 ? " L" + spec.size : ""} · ${LOCO[spec.loco].name} · ${WEAPONS[spec.weapon].name}${spec.wlvl > 1 ? " Mk" + spec.wlvl : ""} · Armor ${spec.armor}${spec.scanner ? " · Scanner " + spec.scanner : ""}`;
 
   function sawDisc(r, teeth, mat) {
     const g = new THREE.Group();
@@ -733,6 +759,12 @@
     } else {
       mesh(rbox(0.22, 0.34, 1.6, 0.08), hub, fx + 0.08, base + 0.25, 0, body);
     }
+    if (spec.scanner) {
+      mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.9, 6), hub, -0.3, topY + 0.45, 0.45, body);
+      const dish = mesh(new THREE.SphereGeometry(0.25 + spec.scanner * 0.1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2.4), toy(0xffffff, 0.4), -0.3, topY + 0.95, 0.45, body);
+      dish.rotation.z = -0.6;
+      mesh(new THREE.SphereGeometry(0.08, 8, 6), glow, -0.2, topY + 1.05, 0.45, body, false);
+    }
     // antenna with a ball in team colour
     mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.8, 6), hub, -0.8, topY + 0.4, -0.5, body);
     mesh(new THREE.SphereGeometry(0.14, 12, 10), paint, -0.8, topY + 0.85, -0.5, body);
@@ -825,7 +857,20 @@
   let lastWinnerWeapon = null;
 
   /* ================= ROUND STATE ================= */
-  let S = null, round = 0, selected = null, following = false, camMode = "action", focusBot = null, focusSince = 0;
+  let S = null, round = 0, selected = null, following = false, camMode = "action", focusBot = null, focusSince = 0, gameMode = "rush";
+  const RUSH_TIME = 150, CP_COUNT = 5, CP_RADIUS = 3.5, CP_HOLD = 2.5;
+  const DECK = [
+    { id: "glass", name: "Glass cannons", text: "All damage ×2 for 30 s.", dur: 30 },
+    { id: "jam", name: "Cannons jammed", text: "Cannons can't fire for 30 s.", dur: 30 },
+    { id: "turbo", name: "Turbo", text: "Everyone drives 40% faster for 30 s.", dur: 30 },
+    { id: "lowgrav", name: "Low gravity", text: "Flips go twice as high, knockback ×1.6 for 30 s.", dur: 30 },
+    { id: "double", name: "Double scrap", text: "Scrap is worth double for 30 s.", dur: 30 },
+    { id: "freeze", name: "Build freeze", text: "Nobody can rebuild for 25 s.", dur: 25 },
+    { id: "reveal", name: "Reveal all", text: "Every hidden checkpoint appears now.", dur: 0 },
+    { id: "crates", name: "Crate storm", text: "Six supply crates drop across the map.", dur: 0 },
+    { id: "tax", name: "Scrap tax", text: "Every other bot loses half its scrap.", dur: 0 },
+  ];
+  const ruleOn = (id) => S && S.rules && S.rules.some((r) => r.id === id);
 
   function startLobby() {
     if (S) {
@@ -839,19 +884,20 @@
     const roster = AGENTS.slice().sort(() => Math.random() - 0.5).slice(0, LOBBY_SIZE);
     S = {
       phase: "lobby", t: 0, fightT: 0, bots: [], items: [], shots: [], queue: roster, joinT: 0.4, countT: 0, resT: 0,
-      crateT: 8, scrapT: 6, lastThinker: null, winner: null, placements: [],
+      crateT: 8, scrapT: 6, lastThinker: null, winner: null, placements: [], mode: gameMode, cps: [], rules: [], pick: null, pickQueue: [], cpSpawnT: 0,
       zone: { cx: 0, cz: 0, r: WORLD - 4, phase: "wait", t: 18, n: 0, fromR: WORLD - 4, toR: WORLD - 4, fromX: 0, fromZ: 0, toX: 0, toZ: 0, dur: 7 },
     };
     setZoneVisible(false);
     ui.results.hidden = true;
     ui.killfeed.innerHTML = "";
+    $("pick").hidden = true; $("rules").innerHTML = "";
     feed(null, `Round ${round} lobby is open. Waiting for ${LOBBY_SIZE} agents.`, "zone");
     renderStandings(true);
     setFollow(false);
   }
 
   function joinBot(agent) {
-    const spec = { chassis: "box", size: 1, loco: "wheels4", weapon: "none", wlvl: 1, armor: 0 };
+    const spec = { chassis: "box", size: 1, loco: "wheels4", weapon: "none", wlvl: 1, armor: 0, scanner: 0 };
     let x, z;
     for (let t = 0; t < 30; t++) {
       const a = rand(0, Math.PI * 2), d = rand(9, 20);
@@ -863,7 +909,7 @@
       aggr: agent.aggr, caution: agent.caution, greed: agent.greed, build: agent.build, mode: agent.mode, favor: agent.favor, crates: agent.crates,
       pref: agent.pref === "copy" ? (lastWinnerWeapon || "saw") : agent.pref,
       spec, gen: 1, x, z, h: rand(-Math.PI, Math.PI), y: 16, vy: 0, landed: false,
-      alive: true, scrap: 0, kills: 0, dmgDealt: 0, dmgSinceBuild: 0, escapes: 0, flipped: 0,
+      alive: true, scrap: 0, kills: 0, cps: 0, deaths: 0, respawnT: 0, dmgDealt: 0, dmgSinceBuild: 0, escapes: 0, flipped: 0,
       cd: rand(0, 1), stun: 0, air: 0, airDur: 1, swing: 0, building: 0, pendingUpgrade: null,
       thinkT: rand(0.5, 1.5), lastThink: -9, goal: { type: "idle" }, thought: "", thoughtAt: -9,
       lastHitBy: null, lastHitAt: -9, deathT: 0, killedBy: null, killedWith: null, history: [], moved: 0, v: 0, lastV: 0, tiltP: 0, tiltR: 0, bump: 0, dustT: 0, hop: null,
@@ -971,6 +1017,7 @@
       if (f === "wedge") add(20, (x) => (x.chassis = "wedge"), "Last round I got flipped. Opening with a low wedge this time.");
       if (f === "armor") add(20, (x) => x.armor++, `Last round a ${mem.killer || "hit"} took me apart. Armor first this time.`);
       if (f === "speed") add(20, (x) => (x.loco = "wheels6"), "Last round I got shot from range. Faster wheels first so I can close the gap.");
+      if (f === "scanner") add(20, (x) => (x.scanner = 1), "Last round I barely found any checkpoints. Scanner first this time.");
       if (f === "keep") { const w = mem.weapon; add(20, (x) => (x.weapon = w), `Won last round with a ${WEAPONS[w].name.toLowerCase()}. Not changing a thing.`); }
     }
     if (s.weapon === "none") {
@@ -991,10 +1038,46 @@
       const w = pick(Object.keys(WEAPON_LINES).filter((k) => k !== s.weapon));
       add(2.2, (x) => { x.weapon = w; x.wlvl = 1; }, `The ${WEAPONS[s.weapon].name.toLowerCase()} hasn't wrecked anyone. Swapping it out. ${WEAPON_LINES[w]}`);
     }
+    if (S.mode === "rush" && (s.scanner || 0) < 2) add((b.cps ? 1 : 2.4) + (b.greed > 0.8 ? 0.8 : 0), (x) => (x.scanner = (x.scanner || 0) + 1), (s.scanner || 0) === 0 ? "Adding a scanner so I can spot hidden checkpoints from further away." : "Upgrading the scanner. More range, more checkpoints.");
     if (s.chassis === "box" && b.gen >= 3) add(0.8, (x) => (x.chassis = "dome"), "Dome shell. Hits glance off the curve.");
     if (!c.length) add(1, (x) => (x.armor = Math.min(3, x.armor + 1)), "Nothing left to change. Polishing the armor.");
     c.sort((a, z) => z.w - a.w);
     return c[0];
+  }
+
+  // ---- Checkpoint Rush brain ----
+  const nearCp = (b, r) => S.cps.some((c) => c.revealed && Math.hypot(c.x - b.x, c.z - b.z) < r);
+  const RULE_REACT = {
+    glass: (b) => b.aggr > 0.6 ? "Glass cannons! Everything hits twice as hard. Time to be brave." : "Glass cannons. One wrong fight and I'm scrap, so I'm careful.",
+    jam: (b) => b.spec.weapon === "cannon" ? "My cannon is jammed. Staying out of fights for now." : "Cannons are jammed. The shooters can't touch me.",
+    turbo: () => "Turbo is on. Covering ground fast.",
+    lowgrav: (b) => b.spec.weapon === "flipper" ? "Low gravity and I have a flipper. Perfect." : "Low gravity. Keeping away from flippers.",
+    double: () => "Double scrap. Grabbing everything I can.",
+    freeze: () => "Build freeze. No upgrades for a while, so I play with what I have.",
+    reveal: () => "All the checkpoints are showing now.",
+    crates: () => "Crates are raining down.",
+    tax: (b) => b.scrap < 2 ? "Scrap tax didn't hurt me, I had nothing." : "Lost half my scrap to the tax.",
+  };
+  function rushGoal(b, enemies) {
+    const cps = S.cps.filter((c) => c.revealed);
+    if (!cps.length) return null;
+    const scored = cps.map((c) => {
+      const d = Math.hypot(c.x - b.x, c.z - b.z);
+      const rivals = enemies.filter((e) => Math.hypot(e.o.x - c.x, e.o.z - c.z) < 12);
+      const threat = rivals.reduce((s, e) => s + power(e.o), 0);
+      return { c, d, rivals, score: d * (threat > power(b) * 1.3 && b.caution > 0.5 ? 2.5 : 1) - (b.mode === "opportunist" && rivals.length > 1 ? -15 : 0) };
+    }).sort((a, z) => a.score - z.score);
+    const best = scored[0];
+    if (best.d > 120) return null;
+    // on the checkpoint with rivals: fight for it
+    if (best.d < CP_RADIUS + 3 && best.rivals.length) {
+      const r = best.rivals.slice().sort((a, z) => a.d - z.d)[0].o;
+      if (b.spec.weapon !== "none" || b.aggr > 0.6) return { type: "hunt", target: r, cp: best.c, text: `${r.name} is contesting my checkpoint. Pushing it off.` };
+    }
+    if (best.d < CP_RADIUS) return { type: "cp", cp: best.c, text: `Holding the checkpoint. ${Math.max(0, CP_HOLD - best.c.capT).toFixed(1)} s to capture.` };
+    const lead = S.bots.slice().sort((a, z) => z.cps - a.cps)[0];
+    const extra = best.rivals.length ? ` ${best.rivals.length} rival${best.rivals.length > 1 ? "s" : ""} near it.` : "";
+    return { type: "cp", cp: best.c, text: `Checkpoint ${Math.round(best.d)}m ${compass(best.c.x - b.x, best.c.z - b.z)}.${extra}${lead && lead !== b && lead.cps > b.cps ? ` ${lead.name} leads with ${lead.cps}, I have ${b.cps}.` : ""} Going for it.` };
   }
 
   function think(b) {
@@ -1014,10 +1097,12 @@
     } else if (near && near.d < 16 && pct(b) < b.caution * 100 && power(near.o) > power(b) * 0.7) {
       goal = { type: "flee", from: near.o };
       text = `I'm at ${pct(b)}% and ${near.o.name} has a ${WEAPONS[near.o.spec.weapon].name.toLowerCase()}. Backing off.`;
-    } else if (b.scrap >= cost(b) && (!near || near.d > 14) && Math.random() < 0.6 + b.build * 0.4) {
+    } else if (b.scrap >= cost(b) && !ruleOn("freeze") && (!near || near.d > 14) && Math.random() < 0.6 + b.build * 0.4 && !(S.mode === "rush" && nearCp(b, 12))) {
       const up = chooseUpgrade(b);
       goal = { type: "build" }; b.pendingUpgrade = up; b.building = 1.6;
       text = `${b.scrap} scrap, enough for an upgrade. ${up.reason}`;
+    } else if (S.mode === "rush" && (goal = rushGoal(b, enemies))) {
+      text = goal.text;
     } else {
       const range = b.mode === "biggest" || b.spec.weapon === "cannon" ? 45 : 36;
       const cands = enemies.filter((e) => e.d < range && !outside(e.o.x, e.o.z, -2));
@@ -1041,6 +1126,8 @@
       }
       if (tgt && b.spec.weapon === "none" && b.mode !== "random" && pct(tgt) > 30) tgt = null;
       if (tgt && early && b.mode !== "revenge") tgt = null;
+      if (tgt && ruleOn("jam") && b.spec.weapon === "cannon" && dist(b, tgt) > 6) { tgt = null; }
+      if (tgt && S.mode === "rush" && dist(b, tgt) > 24 && b.mode !== "biggest" && b.mode !== "revenge") tgt = null;
       if (tgt) { goal = { type: "hunt", target: tgt }; text = why; }
       else if (b.favor === "center" && Math.hypot(b.x - zc.x, b.z - zc.z) > 5 && b.scrap >= 2) {
         goal = { type: "point", x: zc.x + rand(-2, 2), z: zc.z + rand(-2, 2) }; text = "Taking the middle of the zone. Anyone who comes in gets hit.";
@@ -1062,14 +1149,28 @@
           text = best.kind === "crate" ? `Supply crate ${d}m ${compass(best.x - b.x, best.z - b.z)}. Scrap and repairs. Going for it.`
             : need > 0 ? `${b.scrap} scrap, need ${need} more for the next upgrade. Scrap ${d}m ${compass(best.x - b.x, best.z - b.z)}.` : `Grabbing scrap ${d}m ${compass(best.x - b.x, best.z - b.z)} while it's quiet.`;
         } else {
-          const wa = rand(0, Math.PI * 2), wd = Math.sqrt(Math.random()) * zc.r * 0.85;
-          goal = { type: "point", x: zc.x + Math.cos(wa) * wd, z: zc.z + Math.sin(wa) * wd };
-          text = "Nothing useful nearby. Scouting toward the safe zone.";
+          if (S.mode === "rush") {
+            // pick the spot furthest from every other bot (unscanned ground), not too far from me
+            let px = b.x, pz = b.z, bestS = -1e9;
+            for (let k = 0; k < 10; k++) {
+              const a = rand(0, Math.PI * 2), d = Math.sqrt(Math.random()) * (WORLD - 10), qx = Math.cos(a) * d, qz = Math.sin(a) * d;
+              const others = S.bots.filter((o) => o !== b && o.alive).map((o) => Math.hypot(o.x - qx, o.z - qz));
+              const sc = Math.min(80, ...others) - Math.hypot(qx - b.x, qz - b.z) * 0.35;
+              if (sc > bestS) { bestS = sc; px = qx; pz = qz; }
+            }
+            goal = { type: "point", x: px, z: pz };
+            text = `No checkpoints in sight. Exploring ${compass(px - b.x, pz - b.z)} with my ${Math.round(b.st.scan)}m scanner.`;
+          } else {
+            const wa = rand(0, Math.PI * 2), wd = Math.sqrt(Math.random()) * Math.min(zc.r, WORLD - 6) * 0.85;
+            goal = { type: "point", x: zc.x + Math.cos(wa) * wd, z: zc.z + Math.sin(wa) * wd };
+            text = "Nothing useful nearby. Scouting toward the safe zone.";
+          }
         }
       }
     }
+    if (b.ruleReact) { const r = RULE_REACT[b.ruleReact]; if (r) text = r(b) + " " + text; b.ruleReact = null; }
     b.goal = goal; b.thought = text; b.thoughtAt = S.t; S.lastThinker = b;
-    const changed = !prevGoal || prevGoal.type !== goal.type || prevGoal.target !== goal.target;
+    const changed = !prevGoal || prevGoal.type !== goal.type || prevGoal.target !== goal.target || prevGoal.cp !== goal.cp;
     if (changed && (goal.type !== "item" || goal.item.kind === "crate")) feed(b, text);
   }
 
@@ -1103,15 +1204,17 @@
 
   function dealDamage(att, tgt, dmg, st) {
     if (!tgt.alive) return;
+    if (ruleOn("glass")) dmg *= 2;
     tgt.hp -= dmg; tgt.dmgSinceBuild += dmg; tgt.lastHitBy = att; tgt.lastHitAt = S.t;
     att.heat = (att.heat || 0) + dmg * 0.5 + 2; tgt.heat = (tgt.heat || 0) + dmg * 0.5 + 2;
     att.dmgDealt += dmg;
     const dx = tgt.x - att.x, dz = tgt.z - att.z, d = Math.hypot(dx, dz) || 1;
-    tgt.x += (dx / d) * st.knock; tgt.z += (dz / d) * st.knock;
+    const kn = st.knock * (ruleOn("lowgrav") ? 1.6 : 1);
+    tgt.x += (dx / d) * kn; tgt.z += (dz / d) * kn;
     tgt.bump = Math.min(1.5, tgt.bump + 0.8);
     spark(tgt.x - (dx / d) * tgt.r * 0.6, 1.1, tgt.z - (dz / d) * tgt.r * 0.6, 14, [0xffd166, 0xffffff, 0xff8a3a], 6);
     tgt.R.paint.emissive.setHex(0xff2200); tgt.R.paint.emissiveIntensity = 0.6; tgt.flash = 0.15;
-    if (st.flip && tgt.air <= 0 && tgt.spec.chassis !== "wedge") { tgt.air = 0.9; tgt.airDur = 0.9; tgt.stun = 1.0; tgt.flipped++; }
+    if (st.flip && tgt.air <= 0 && tgt.spec.chassis !== "wedge") { const lg = ruleOn("lowgrav") ? 2 : 1; tgt.air = 0.9 * lg; tgt.airDur = 0.9 * lg; tgt.stun = 1.0 * lg; tgt.flipped++; }
     if (tgt.building > 0 && Math.random() < 0.35) { tgt.building = 0; tgt.pendingUpgrade = null; tgt.thought = "Got hit mid-rebuild. Build cancelled."; tgt.thoughtAt = S.t; feed(tgt, "Got hit mid-rebuild. Build cancelled, fighting back."); tgt.goal = { type: "hunt", target: att }; }
     drawLabel(tgt);
     if (tgt.hp <= 0) kill(tgt, att);
@@ -1120,7 +1223,8 @@
 
   function kill(b, by) {
     b.alive = false; b.hp = 0; b.deathT = S.fightT; b.killedBy = by; b.killedWith = by ? by.spec.weapon : null;
-    S.placements.unshift(b);
+    b.deaths++;
+    if (S.mode === "rush") b.respawnT = 4; else S.placements.unshift(b);
     const drop = 3 + b.gen * 2 + Math.floor(b.scrap / 2);
     const n = Math.min(8, Math.ceil(drop / 2));
     for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; spawnScrap(b.x + Math.cos(a) * 1.8, b.z + Math.sin(a) * 1.8, Math.ceil(drop / n)); }
@@ -1136,15 +1240,15 @@
     if (by) {
       by.kills++; by.agent.wrecks++;
       killFeed(`${bw} wrecked ${vw}`);
-      feed(by, `wrecked ${vw} with a ${esc(WEAPONS[by.spec.weapon].name.toLowerCase())}. ${drop} scrap on the ground.`, "kill");
+      feed(by, `wrecked ${vw} with a ${esc(WEAPONS[by.spec.weapon].name.toLowerCase())}. ${drop} scrap on the ground.${S.mode === "rush" ? ` ${esc(b.name)} respawns as v1 in 4 s.` : ""}`, "kill");
       by.thinkT = Math.min(by.thinkT, 0.4);
     } else {
       killFeed(`${vw} got caught by the zone`);
       feed(b, "got caught outside the zone and broke down.", "kill");
     }
-    if (selected === b.id && following) setTimeout(() => { if (S && S.bots[b.id] === b && following && selected === b.id) { if (by && by.alive) select(by.id, true); else setFollow(false); } }, 2000);
+    if (selected === b.id && following && S.mode !== "rush") setTimeout(() => { if (S && S.bots[b.id] === b && following && selected === b.id) { if (by && by.alive) select(by.id, true); else setFollow(false); } }, 2000);
     const alive = S.bots.filter((o) => o.alive);
-    if (alive.length <= 1 && S.phase === "fight") endRound(alive[0] || b);
+    if (S.mode !== "rush" && alive.length <= 1 && S.phase === "fight") endRound(alive[0] || b);
   }
 
   function steerTo(b, tx, tz, dt, stopAt = 0.6, faceOnly = false, speedMul = 1) {
@@ -1154,7 +1258,7 @@
     const dh = clamp(diff, -turn, turn);
     b.h += dh; b.turn = dh / dt;
     if (faceOnly || d < stopAt) return 0;
-    const v = b.st.speed * speedMul * Math.max(0.15, Math.cos(diff));
+    const v = b.st.speed * speedMul * (ruleOn("turbo") ? 1.4 : 1) * Math.max(0.15, Math.cos(diff));
     const step = Math.min(v * dt, d - stopAt * 0.5);
     b.x += Math.cos(b.h) * step; b.z -= Math.sin(b.h) * step;
     return Math.max(0, step);
@@ -1195,6 +1299,7 @@
         if (g.type === "hunt" && g.target.alive && dist(b, g.target) > 55) { b.escapes++; b.thinkT = 0; }
         if (g.type === "item" && !S.items.includes(g.item)) b.thinkT = Math.min(b.thinkT, 0.2);
         if (g.type === "flee" && !g.from.alive) b.thinkT = Math.min(b.thinkT, 0.2);
+        if ((g.type === "cp" || g.cp) && !S.cps.includes(g.cp)) b.thinkT = Math.min(b.thinkT, 0.2);
         if (b.building > 0) {
           b.building -= dt;
           if (Math.random() < dt * 14) spark(b.x + rand(-1, 1), rand(0.5, 2), b.z + rand(-1, 1), 3, [0x7fe8ff, 0xffffff], 3);
@@ -1218,6 +1323,7 @@
             moved = steerTo(b, b.x + ax, b.z + az, dt);
           } else if (g2.type === "item") moved = steerTo(b, g2.item.x, g2.item.z, dt, 0.2);
           else if (g2.type === "zone") { const zc = safeCenter(); moved = steerTo(b, zc.x, zc.z, dt, 2); }
+          else if (g2.type === "cp") { moved = steerTo(b, g2.cp.x, g2.cp.z, dt, 0.8); if (moved === 0 && Math.hypot(g2.cp.x - b.x, g2.cp.z - b.z) < CP_RADIUS) b.thinkT = Math.min(b.thinkT, 1.2); }
           else if (g2.type === "point") { moved = steerTo(b, g2.x, g2.z, dt, 1.5); if (moved === 0) b.thinkT = Math.min(b.thinkT, 0.4); }
         }
         if (b.cd <= 0 && b.stun <= 0 && b.building <= 0 && b.goal.type !== "flee") {
@@ -1226,7 +1332,7 @@
           if (!tgt && !b.st.ranged && S.fightT > 6) for (const o of alive) if (o !== b && o.alive && !o.hop && dist(b, o) <= b.st.range + o.r * 0.3) { tgt = o; break; }
           if (tgt) {
             const facing = Math.abs(wrapA(Math.atan2(-(tgt.z - b.z), tgt.x - b.x) - b.h));
-            if (facing < (b.st.ranged ? 0.35 : 1.0)) {
+            if (facing < (b.st.ranged ? 0.35 : 1.0) && !(b.st.ranged && ruleOn("jam"))) {
               b.cd = b.st.cd * rand(0.9, 1.1); b.swing = 1;
               if (b.st.ranged) fire(b, tgt); else dealDamage(b, tgt, b.st.dmg, b.st);
             }
@@ -1243,7 +1349,7 @@
           const it = S.items[i];
           if (it.kind === "crate" && !it.landed) continue;
           if (Math.hypot(it.x - b.x, it.z - b.z) < b.r + 0.6) {
-            b.scrap += it.value;
+            b.scrap += it.heal ? it.value : it.value * (ruleOn("double") ? 2 : 1);
             if (it.heal) { b.hp = Math.min(b.maxHp, b.hp + it.heal); drawLabel(b); spark(it.x, 1, it.z, 25, [0x22a867, 0xffffff], 5); feed(b, `opened a supply crate: +${it.value} scrap, +${it.heal} HP.`, "drop"); }
             else spark(it.x, 0.6, it.z, 4, 0xffd166, 3);
             dyn.remove(it.mesh); S.items.splice(i, 1);
@@ -1294,23 +1400,36 @@
       S.countT -= dt;
       if (S.countT <= 0) {
         S.phase = "fight"; S.fightT = 0;
-        planZone(); setZoneVisible(true); drawZone();
         for (let i = 0; i < 300; i++) spawnScrap(null, null, 1);
-        feed(null, `GO! ${S.bots.length} bots, one winner.`, "zone");
+        if (S.mode === "rush") {
+          Object.assign(S.zone, { r: WORLD * 3, toR: WORLD * 3, phase: "off", t: 0 });
+          setZoneVisible(false);
+          for (let i = 0; i < CP_COUNT; i++) spawnCheckpoint();
+          feed(null, `GO! ${CP_COUNT} checkpoints are hidden on the map. Most captures in ${RUSH_TIME / 60 | 0}:${String(RUSH_TIME % 60).padStart(2, "0")} wins.`, "zone");
+        } else {
+          planZone(); setZoneVisible(true); drawZone();
+          feed(null, `GO! ${S.bots.length} bots, one winner.`, "zone");
+        }
         S.bots.forEach((b) => { b.thinkT = rand(0, 0.8); b.goal = { type: "idle" }; });
       }
     } else if (S.phase === "fight") {
       S.fightT += dt;
-      updateZone(dt);
+      if (S.mode === "rush") {
+        updateCheckpoints(dt);
+        S.rules = S.rules.filter((r) => r.until > S.fightT);
+        for (const b of S.bots) if (!b.alive && b.respawnT > 0) { b.respawnT -= dt; if (b.respawnT <= 0) respawn(b); }
+        if (S.pick && !S.pick.human) { S.pick.t -= dt; if (S.pick.t <= 0) resolvePick(ownerChoice(S.pick.b, S.pick.hand), false); }
+        if (S.fightT >= RUSH_TIME) endRush();
+      } else updateZone(dt);
       S.crateT -= dt;
       if (S.crateT <= 0 && S.zone.r > 7) {
         S.crateT = rand(8, 12);
-        const a = rand(0, Math.PI * 2), d = rand(0, S.zone.r * 0.7);
+        const a = rand(0, Math.PI * 2), d = rand(0, Math.min(S.zone.r, WORLD - 8) * 0.7);
         spawnCrate(S.zone.cx + Math.cos(a) * d, S.zone.cz + Math.sin(a) * d, false);
         feed(null, `A supply crate is dropping ${compass(Math.cos(a), Math.sin(a))} of the zone center.`, "drop");
       }
       S.scrapT -= dt;
-      if (S.scrapT <= 0) { S.scrapT = 5; for (let i = 0; i < 8; i++) { const a = rand(0, Math.PI * 2), d = rand(0, S.zone.r * 0.85); spawnScrap(S.zone.cx + Math.cos(a) * d, S.zone.cz + Math.sin(a) * d, 1); } }
+      if (S.scrapT <= 0) { S.scrapT = 5; for (let i = 0; i < 8; i++) { const a = rand(0, Math.PI * 2), d = rand(0, Math.min(S.zone.r, WORLD - 6) * 0.85); spawnScrap(S.zone.cx + Math.cos(a) * d, S.zone.cz + Math.sin(a) * d, 1); } }
     } else if (S.phase === "results") {
       S.resT -= dt;
       if (S.winner && S.winner.alive && Math.random() < dt * 3) spark(S.winner.x, 3, S.winner.z, 20, [0xff5a36, 0xffd166, 0x6ec6ff, 0x4fd18b, 0xff7eb6, 0x9b7bff], 9, 9);
@@ -1355,31 +1474,150 @@
   }
 
   function endRound(w) {
-    S.phase = "results"; S.winner = w; S.resT = 9;
     if (w.alive) S.placements.unshift(w);
+    finishRound(S.placements.slice());
+  }
+  function endRush() {
+    if (S.phase !== "fight") return;
+    const order = S.bots.slice().sort((a, z) => z.cps - a.cps || z.kills - a.kills || a.deaths - z.deaths);
+    finishRound(order);
+  }
+  function finishRound(order) {
+    const w = order[0];
+    S.phase = "results"; S.winner = w; S.resT = 10; S.pick = null; $("pick").hidden = true;
+    const rush = S.mode === "rush";
     const pts = [10, 6, 4, 2, 2];
-    S.placements.forEach((b, i) => {
+    const gain = (b, i) => (pts[i] || 0) + b.kills * 2 + (rush ? b.cps * 2 : 0);
+    order.forEach((b, i) => {
       const a = b.agent;
-      a.rounds++; a.points += (pts[i] || 0) + b.kills * 2;
+      a.rounds++; a.points += gain(b, i); a.cps = (a.cps || 0) + (b.cps || 0);
       if (i === 0) a.wins++;
       // lesson for next round
-      if (i === 0) a.memory = { lesson: `Won round ${round} with a ${WEAPONS[b.spec.weapon].name.toLowerCase()}. Keeping it.`, first: b.spec.weapon !== "none" ? "keep" : null, weapon: b.spec.weapon };
+      if (i === 0) a.memory = { lesson: rush ? `Won round ${round} with ${b.cps} checkpoints using a ${WEAPONS[b.spec.weapon].name.toLowerCase()}. Same plan.` : `Won round ${round} with a ${WEAPONS[b.spec.weapon].name.toLowerCase()}. Keeping it.`, first: b.spec.weapon !== "none" ? "keep" : null, weapon: b.spec.weapon };
+      else if (rush && b.cps === 0) a.memory = { lesson: `Found no checkpoints in round ${round}. Scanner first, explore early.`, first: "scanner" };
+      else if (rush && b.deaths >= 2) a.memory = { lesson: `Wrecked ${b.deaths} times in round ${round}. Armor first.`, first: "armor", killer: b.killedWith ? WEAPONS[b.killedWith].name.toLowerCase() : "hit" };
+      else if (rush) a.memory = { lesson: `${b.cps} checkpoint${b.cps === 1 ? "" : "s"} in round ${round}. Need to hold them better: armor first.`, first: "armor", killer: "rival" };
       else if (!b.killedBy) a.memory = { lesson: `Got caught by the zone in round ${round}. Watch the circle earlier.`, first: null };
       else if (b.killedWith === "flipper") a.memory = { lesson: `${b.killedBy.name} flipped me in round ${round}. Opening with a wedge.`, first: "wedge" };
       else if (b.killedWith === "cannon") a.memory = { lesson: `${b.killedBy.name} shot me from range in round ${round}. Faster wheels first.`, first: "speed" };
       else a.memory = { lesson: `${b.killedBy.name}'s ${WEAPONS[b.killedWith || "none"].name.toLowerCase()} wrecked me in round ${round}. Armor first.`, first: "armor", killer: WEAPONS[b.killedWith || "none"].name.toLowerCase() };
     });
     lastWinnerWeapon = w.spec.weapon !== "none" ? w.spec.weapon : lastWinnerWeapon;
-    feed(w, `wins round ${round}!`, "kill");
+    feed(w, rush ? `wins round ${round} with ${w.cps} checkpoint${w.cps === 1 ? "" : "s"}!` : `wins round ${round}!`, "kill");
     setTimeout(() => {
       if (!S || S.phase !== "results") return;
-      $("resLabel").textContent = `Round ${round} results`;
+      $("resLabel").textContent = `Round ${round} results · ${rush ? "Checkpoint Rush" : "Last Bot Standing"}`;
       $("resTitle").innerHTML = `<span style="color:${hexStr(w.color)}">${w.name}</span> wins!`;
-      $("podium").innerHTML = S.placements.slice(0, 3).map((b, i) => `<div class="pod p${i + 1}"><img src="${b.history[b.history.length - 1].img}" alt=""><b style="color:${hexStr(b.color)}">${b.name}</b><span>${["1st", "2nd", "3rd"][i]} · +${pts[i] + b.kills * 2} pts</span><span>v${b.gen} · ${b.kills} wreck${b.kills === 1 ? "" : "s"}</span></div>`).join("");
+      $("podium").innerHTML = order.slice(0, 3).map((b, i) => `<div class="pod p${i + 1}"><img src="${b.history[b.history.length - 1].img}" alt=""><b style="color:${hexStr(b.color)}">${b.name}</b><span>${["1st", "2nd", "3rd"][i]} · +${gain(b, i)} pts</span><span>${rush ? `${b.cps} checkpoint${b.cps === 1 ? "" : "s"} · ` : ""}${b.kills} wreck${b.kills === 1 ? "" : "s"}</span></div>`).join("");
       $("resNote").textContent = `“${w.instr}” · finished as ${describe(w.spec)} · ${Math.round(S.fightT)}s round`;
       ui.results.hidden = false;
       select(w.id, true);
     }, 1800);
+  }
+
+  function respawn(b) {
+    let x = 0, z = 0;
+    for (let t = 0; t < 30; t++) {
+      const a = rand(0, Math.PI * 2), d = rand(20, WORLD - 10); x = Math.cos(a) * d; z = Math.sin(a) * d;
+      if (!obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 2) && !S.bots.some((o) => o.alive && Math.hypot(o.x - x, o.z - z) < 18)) break;
+    }
+    Object.assign(b, { x, z, y: 18, vy: 0, landed: false, alive: true, gen: 1, scrap: 0, respawnT: 0, cd: 1, stun: 0, air: 0, building: 0, pendingUpgrade: null, dmgSinceBuild: 0, escapes: 0, flipped: 0, goal: { type: "idle" }, thinkT: 0.6, killedBy: null });
+    b.spec = { chassis: "box", size: 1, loco: "wheels4", weapon: "none", wlvl: 1, armor: 0, scanner: 0 };
+    b.st = stats(b.spec); b.maxHp = b.st.maxHp; b.hp = b.maxHp; b.r = 1.3 * sizeScale(b.spec.size);
+    b.label.sp.visible = true;
+    mountMesh(b);
+    b.history.push({ gen: 1, reason: `Wrecked, respawned as a plain box. Still holding ${b.cps} checkpoint${b.cps === 1 ? "" : "s"}.`, img: thumb(b.spec, b.color) });
+    b.thought = `Back in, starting over as v1. I still have ${b.cps} checkpoint${b.cps === 1 ? "" : "s"}.`; b.thoughtAt = S.t;
+  }
+
+  /* ================= CHECKPOINTS ================= */
+  const cpPillarGeo = new THREE.CylinderGeometry(1.3, 1.3, 60, 24, 1, true);
+  const cpGemGeo = new THREE.OctahedronGeometry(1, 0);
+  const cpPadGeo = new THREE.CylinderGeometry(CP_RADIUS, CP_RADIUS, 0.12, 40);
+  function spawnCheckpoint() {
+    let x = 0, z = 0;
+    for (let t = 0; t < 60; t++) {
+      const a = rand(0, Math.PI * 2), d = rand(18, WORLD - 10); x = Math.cos(a) * d; z = Math.sin(a) * d;
+      if (!obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + CP_RADIUS + 1) && !S.cps.some((c) => Math.hypot(c.x - x, c.z - z) < 40) && !S.bots.some((b) => b.alive && Math.hypot(b.x - x, b.z - z) < 25)) break;
+    }
+    const g = new THREE.Group(); g.position.set(x, 0, z); g.visible = false;
+    const pad = mesh(cpPadGeo, toy(0xffffff, 0.5), 0, 0.06, 0, g); pad.castShadow = false;
+    const pillar = new THREE.Mesh(cpPillarGeo, new THREE.MeshBasicMaterial({ color: lin(0xffd166), transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide }));
+    pillar.position.y = 30; g.add(pillar);
+    const gem = mesh(cpGemGeo, toy(0xffd166, 0.25, 0.3, { emissive: 0xffb703, emissiveIntensity: 0.6 }), 0, 3.2, 0, g);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(CP_RADIUS - 0.5, CP_RADIUS, 48, 1, 0, 0.001), new THREE.MeshBasicMaterial({ color: lin(0xff5a36), side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.14; g.add(ring);
+    dyn.add(g);
+    const cp = { x, z, revealed: false, capT: 0, holder: null, contested: false, g, gem, ring, pillar, shownP: 0, pop: 0 };
+    S.cps.push(cp);
+    return cp;
+  }
+  function revealCp(cp, b) {
+    cp.revealed = true; cp.g.visible = true; cp.pop = 1;
+    spark(cp.x, 3, cp.z, 30, [0xffd166, 0xffffff], 7);
+    if (b) { b.heat = (b.heat || 0) + 4; feed(b, `found a hidden checkpoint ${compass(cp.x, cp.z)} of the map center.`, "cp"); killFeed(`<b style="color:${hexStr(b.color)}">${b.name}</b> found a checkpoint`); }
+    S.bots.forEach((o) => { if (o.alive) o.thinkT = Math.min(o.thinkT, rand(0.2, 1.2)); });
+  }
+  function updateCheckpoints(dt) {
+    S.cpSpawnT -= dt;
+    if (S.cps.length < CP_COUNT && S.cpSpawnT <= 0) { spawnCheckpoint(); S.cpSpawnT = 3; }
+    for (const cp of S.cps.slice()) {
+      if (!cp.revealed) {
+        const finder = S.bots.find((b) => b.alive && b.landed && !b.hop && Math.hypot(b.x - cp.x, b.z - cp.z) < b.st.scan);
+        if (finder) revealCp(cp, finder);
+        continue;
+      }
+      const on = S.bots.filter((b) => b.alive && b.landed && !b.hop && Math.hypot(b.x - cp.x, b.z - cp.z) < CP_RADIUS);
+      cp.contested = on.length > 1;
+      if (on.length === 1) {
+        if (cp.holder !== on[0]) { cp.holder = on[0]; cp.capT = 0; }
+        cp.capT += dt; on[0].heat = (on[0].heat || 0) + dt * 1.5;
+        if (cp.capT >= CP_HOLD) captureCp(cp, on[0]);
+      } else if (!on.length) cp.capT = Math.max(0, cp.capT - dt * 0.5);
+    }
+  }
+  function captureCp(cp, b) {
+    b.cps++;
+    S.cps.splice(S.cps.indexOf(cp), 1);
+    dyn.remove(cp.g);
+    S.cpSpawnT = 3;
+    spark(cp.x, 3, cp.z, 80, [0xffd166, 0xff5a36, 0xffffff, b.color], 10, 10);
+    shake = 0.4; b.heat = (b.heat || 0) + 8; b.bump = 1.4;
+    feed(b, `captured a checkpoint! That's ${b.cps}.`, "cp");
+    killFeed(`<b style="color:${hexStr(b.color)}">${b.name}</b> captured a checkpoint (${b.cps})`);
+    b.thought = `Captured it! ${b.cps} checkpoint${b.cps === 1 ? "" : "s"}. Now I get to change the rules.`; b.thoughtAt = S.t;
+    b.thinkT = 0.5;
+    const hand = DECK.slice().sort(() => Math.random() - 0.5).filter((c) => !S.rules.some((r) => r.id === c.id)).slice(0, 3);
+    if (S.pick) S.pickQueue.push({ b, hand }); else startPick(b, hand);
+  }
+  function ownerChoice(b, hand) {
+    const want = b.aggr > 0.75 ? ["glass", "turbo", "lowgrav"] : b.greed > 0.85 ? ["double", "crates", "tax"] : b.mode === "opportunist" || b.caution > 0.55 ? ["reveal", "jam", "freeze"] : b.spec.weapon === "flipper" ? ["lowgrav"] : [];
+    return hand.find((c) => want.includes(c.id)) || pick(hand);
+  }
+  function startPick(b, hand) {
+    const human = selected !== null && S.bots[selected] === b && !document.hidden;
+    S.pick = { b, hand, human, t: rand(1.2, 2.4), deadline: performance.now() + 10000 };
+    if (human) {
+      $("pickTitle").innerHTML = `Your bot <b style="color:${hexStr(b.color)}">${esc(b.name)}</b> captured a checkpoint. Pick a rule for everyone:`;
+      $("pickCards").innerHTML = hand.map((c, i) => `<button class="card-btn" type="button" data-card="${i}"><b>${esc(c.name)}</b><span>${esc(c.text)}</span></button>`).join("");
+      $("pick").hidden = false;
+      const first = $("pickCards").querySelector("button"); if (first) first.focus({ preventScroll: true });
+    }
+  }
+  $("pickCards").addEventListener("click", (e) => { const btn = e.target.closest("[data-card]"); if (btn && S.pick && S.pick.human) resolvePick(S.pick.hand[+btn.dataset.card], true); });
+  function resolvePick(card, byViewer) {
+    const P = S.pick; if (!P) return;
+    S.pick = null; $("pick").hidden = true;
+    const b = P.b;
+    if (card.dur) { S.rules = S.rules.filter((r) => r.id !== card.id); S.rules.push({ ...card, until: S.fightT + card.dur }); }
+    if (card.id === "reveal") S.cps.filter((c) => !c.revealed).forEach((c) => revealCp(c, null));
+    if (card.id === "crates") for (let i = 0; i < 6; i++) { const a = rand(0, Math.PI * 2), d = rand(10, WORLD - 12); spawnCrate(Math.cos(a) * d, Math.sin(a) * d, false); }
+    if (card.id === "tax") S.bots.forEach((o) => { if (o !== b) o.scrap = Math.floor(o.scrap / 2); });
+    const who = byViewer ? "You" : P.human ? `${b.name}'s agent (you ran out of time)` : `${b.name}'s owner`;
+    feed(null, `<b style="color:${hexStr(b.color)}">${esc(who)}</b> played <b>${esc(card.name)}</b>: ${esc(card.text)}`, "rule");
+    killFeed(`<b>${esc(card.name.toUpperCase())}</b> is in play`);
+    S.bots.forEach((o) => { if (o.alive) { o.ruleReact = card.id; o.thinkT = Math.min(o.thinkT, rand(0.3, 1.5)); } });
+    if (S.pickQueue.length) { const q = S.pickQueue.shift(); startPick(q.b, q.hand); }
   }
 
   /* ================= VISUAL SYNC ================= */
@@ -1412,6 +1650,19 @@
         it.y = Math.max(0, it.y - dt * 9); it.mesh.position.y = it.y;
         if (it.y <= 0) { it.landed = true; it.mesh.remove(it.chute); puff(it.x, 0.3, it.z, 6, 0xfde2c4, 1.2, 1.2); for (const p of props) { const dx = p.x - it.x, dz = p.z - it.z, d = Math.hypot(dx, dz); if (d < 3 && d > 0.01) knockProp(p, dx / d, dz / d, 4, 3); } }
       }
+    }
+    for (const cp of S.cps) {
+      if (!cp.revealed) continue;
+      cp.pop = Math.max(0, cp.pop - dt * 2);
+      cp.gem.rotation.y += dt * 1.5; cp.gem.position.y = 3.2 + Math.sin(t * 2 + cp.x) * 0.3;
+      cp.g.scale.setScalar(1 + cp.pop * 0.4);
+      cp.pillar.material.opacity = 0.22 + Math.sin(t * 3) * 0.06;
+      const p = clamp(cp.capT / CP_HOLD, 0, 1);
+      if (Math.abs(p - cp.shownP) > 0.02 || (p === 0 && cp.shownP !== 0)) {
+        cp.shownP = p; cp.ring.geometry.dispose();
+        cp.ring.geometry = new THREE.RingGeometry(CP_RADIUS - 0.5, CP_RADIUS, 48, 1, 0, Math.max(0.001, p * Math.PI * 2));
+      }
+      cp.ring.material.color.copy(lin(cp.contested ? 0xe2402c : cp.holder ? cp.holder.color : 0xff5a36));
     }
     const sel = selected !== null ? S.bots[selected] : null;
     S.bots.forEach((b) => { if (b.alive) b.label.sp.visible = !(following && b === sel); });
@@ -1474,6 +1725,7 @@
       cam.radius = Math.hypot(d, hgt);
     } else {
       if (!cam.dragging && !reduced && now - cam.lastInput > 3000) cam.theta += dt * 0.05;
+      if (S.phase === "lobby" && !cam.dragging && now - cam.lastInput > 3000) { let d = (0.3 - cam.theta) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; cam.theta += d * Math.min(1, dt * 0.8); }
       let cx = 0, cz = 0, want = 60;
       if (S.phase === "lobby") { want = 62; }
       else if (S.phase === "countdown") { want = WORLD * 2.1; }
@@ -1524,7 +1776,7 @@
     g.save();
     g.beginPath(); g.arc(c, c, W / 2 - 2, 0, 7); g.fillStyle = "#fff3e6"; g.fill(); g.clip();
     g.beginPath(); g.arc(c, c, WORLD * sc, 0, 7); g.fillStyle = "#f3a462"; g.fill();
-    if (S.phase === "fight" || S.phase === "results") {
+    if ((S.phase === "fight" || S.phase === "results") && S.zone.phase !== "off") {
       const Z = S.zone;
       const zx = c + Z.cx * sc, zy = c + Z.cz * sc, zr = Math.max(0, Z.r * sc);
       g.beginPath(); g.arc(c, c, WORLD * sc + 4, 0, Math.PI * 2);
@@ -1534,6 +1786,12 @@
     }
     g.fillStyle = "#ff5a36";
     for (const it of S.items) if (it.kind === "crate") g.fillRect(c + it.x * sc - 5, c + it.z * sc - 5, 10, 10);
+    for (const cp of S.cps) {
+      if (!cp.revealed) continue;
+      const x = c + cp.x * sc, y = c + cp.z * sc;
+      g.beginPath(); g.moveTo(x, y - 11); g.lineTo(x + 9, y); g.lineTo(x, y + 11); g.lineTo(x - 9, y); g.closePath();
+      g.fillStyle = "#ffd166"; g.fill(); g.lineWidth = 3; g.strokeStyle = cp.contested ? "#e2402c" : "#2b1d16"; g.stroke();
+    }
     const sel = selected !== null ? S.bots[selected] : null;
     for (const b of S.bots) {
       if (!b.landed && !b.alive) continue;
@@ -1551,12 +1809,12 @@
   const ui = {
     feed: $("feed"), killfeed: $("killfeed"), standings: $("standings"), bubble: $("bubble"), results: $("results"),
     alive: $("alive"), zoneLine: $("zoneLine"), phaseLabel: $("phaseLabel"), sponsorBtn: $("sponsorBtn"), sponsorName: $("sponsorName"), sponsorText: $("sponsorText"),
-    overviewBtn: $("overviewBtn"), actionBtn: $("actionBtn"), centerBig: $("centerBig"), centerLine: $("centerLine"), seasonWrap: $("seasonWrap"), seasonBody: $("seasonBody"),
+    overviewBtn: $("overviewBtn"), actionBtn: $("actionBtn"), modeBtn: $("modeBtn"), centerBig: $("centerBig"), centerLine: $("centerLine"), seasonWrap: $("seasonWrap"), seasonBody: $("seasonBody"),
   };
   const fmtT = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   function feed(b, html, kind) {
     const li = document.createElement("li");
-    const tags = { evo: "evo-t EVOLVED", kill: "kill-t WRECK", drop: "drop-t CRATE", zone: "zone-t ARENA", join: "join-t JOINED" };
+    const tags = { evo: "evo-t EVOLVED", kill: "kill-t WRECK", drop: "drop-t CRATE", zone: "zone-t ARENA", join: "join-t JOINED", cp: "cp-t CHECKPOINT", rule: "rule-t RULE" };
     const tag = tags[kind] ? `<span class="tag ${tags[kind].split(" ")[0]}">${tags[kind].split(" ")[1]}</span>` : "";
     const who = b ? `<span class="n" style="color:${hexStr(b.color)}">${b.name}</span>` : "";
     li.innerHTML = `<time>${S && S.phase === "fight" ? fmtT(S.fightT) : "R" + round}</time><span>${tag}${who}${kind ? html : "“" + esc(html) + "”"}</span>`;
@@ -1580,18 +1838,19 @@
       const q = (s) => li.querySelector(s);
       rows.byId[b.id] = { li, btn: q("button"), img: q("img"), ver: q("small"), sub: q(".st-sub"), bar: q(".st-bar div"), k: q(".st-k"), imgSrc: "" };
     }
-    const sorted = S.bots.slice().sort((a, z) => (z.alive - a.alive) || (a.alive ? z.kills - a.kills || z.hp - a.hp : z.deathT - a.deathT));
+    const sorted = S.mode === "rush" ? S.bots.slice().sort((a, z) => z.cps - a.cps || z.kills - a.kills || a.deaths - z.deaths)
+      : S.bots.slice().sort((a, z) => (z.alive - a.alive) || (a.alive ? z.kills - a.kills || z.hp - a.hp : z.deathT - a.deathT));
     for (const b of sorted) {
       const r = rows.byId[b.id], f = clamp(b.hp / b.maxHp, 0, 1);
       const img = b.history[b.history.length - 1].img;
       if (r.imgSrc !== img) { r.img.src = img; r.imgSrc = img; }
       r.ver.textContent = "v" + b.gen;
-      r.sub.textContent = b.alive ? describe(b.spec) : b.killedBy ? `Wrecked by ${b.killedBy.name}` : "Caught by the zone";
+      r.sub.textContent = b.alive ? describe(b.spec) : S.mode === "rush" ? `Wrecked · back in ${Math.max(0, Math.ceil(b.respawnT))} s` : b.killedBy ? `Wrecked by ${b.killedBy.name}` : "Caught by the zone";
       r.bar.style.width = f * 100 + "%";
       r.bar.style.background = f > 0.5 ? "var(--good)" : f > 0.25 ? "var(--gold)" : "var(--bad)";
-      r.k.textContent = `${b.kills} wreck${b.kills === 1 ? "" : "s"}`;
+      r.k.textContent = S.mode === "rush" ? `${b.cps} ◆ · ${b.kills} wr` : `${b.kills} wreck${b.kills === 1 ? "" : "s"}`;
       r.btn.classList.toggle("sel", b.id === selected);
-      r.btn.classList.toggle("out", !b.alive);
+      r.btn.classList.toggle("out", !b.alive && S.mode !== "rush");
     }
     const order = sorted.map((b) => b.id).join(",");
     if (order !== lastOrder) { lastOrder = order; sorted.forEach((b) => ui.standings.appendChild(rows.byId[b.id].li)); }
@@ -1602,10 +1861,10 @@
   function renderSeason() {
     const sorted = AGENTS.slice().sort((a, z) => z.points - a.points || z.wins - a.wins || z.wrecks - a.wrecks);
     const selAgent = selected !== null && S.bots[selected] ? S.bots[selected].agent : null;
-    const key = sorted.map((a) => a.name + a.points + a.rounds).join() + (selAgent ? selAgent.name : "");
+    const key = sorted.map((a) => a.name + a.points + a.rounds + (a.cps || 0)).join() + (selAgent ? selAgent.name : "");
     if (key === lastSeasonKey) return;
     lastSeasonKey = key;
-    ui.seasonBody.innerHTML = sorted.map((a, i) => `<tr class="${a === selAgent ? "sel" : ""}"><td>${i + 1}</td><td style="color:${hexStr(a.color)}">${a.name}</td><td>${a.points}</td><td>${a.wins}</td><td>${a.wrecks}</td><td>${a.rounds}</td></tr>`).join("");
+    ui.seasonBody.innerHTML = sorted.map((a, i) => `<tr class="${a === selAgent ? "sel" : ""}"><td>${i + 1}</td><td style="color:${hexStr(a.color)}">${a.name}</td><td>${a.points}</td><td>${a.wins}</td><td>${a.cps || 0}</td><td>${a.wrecks}</td><td>${a.rounds}</td></tr>`).join("");
   }
   function setTab(season) {
     $("tabRound").setAttribute("aria-selected", String(!season)); $("tabSeason").setAttribute("aria-selected", String(season));
@@ -1630,16 +1889,16 @@
     $("fVer").textContent = "v" + b.gen;
     const st = $("fState");
     st.className = "who-state" + (b.alive ? "" : " dead");
-    st.textContent = !b.alive ? "WRECKED" : S.phase === "results" ? "WINNER" : S.phase !== "fight" ? (b.landed ? "IN LOBBY" : "DROPPING IN") : b.building > 0 ? "REBUILDING" : ({ hunt: "HUNTING", flee: "RETREATING", item: "SCAVENGING", zone: "OUTRUNNING ZONE", point: "MOVING", build: "REBUILDING", idle: "THINKING" })[b.goal.type] || "";
+    st.textContent = !b.alive ? (S.mode === "rush" && S.phase === "fight" ? `RESPAWN IN ${Math.max(0, Math.ceil(b.respawnT))}s` : "WRECKED") : S.phase === "results" ? "WINNER" : S.phase !== "fight" ? (b.landed ? "IN LOBBY" : "DROPPING IN") : b.building > 0 ? "REBUILDING" : ({ hunt: "HUNTING", flee: "RETREATING", item: "SCAVENGING", zone: "OUTRUNNING ZONE", point: S.mode === "rush" ? "EXPLORING" : "MOVING", build: "REBUILDING", idle: "THINKING", cp: "CAPTURING" })[b.goal.type] || "";
     $("fInstr").textContent = b.instr;
     const mem = b.agent.memory;
     $("fLessonWrap").hidden = !mem; if (mem) $("fLesson").textContent = mem.lesson;
     $("fHp").textContent = `${Math.max(0, Math.round(b.hp))}/${b.maxHp}`;
     $("fScrap").textContent = `${b.scrap}/${cost(b)}`;
     $("fKills").textContent = b.kills;
-    $("fWins").textContent = b.agent.wins;
+    $("fWins").textContent = b.cps;
     $("fBuild").textContent = describe(b.spec);
-    $("fThought").textContent = b.alive ? (b.thought ? `“${b.thought}”` : "") : b.killedBy ? `Wrecked by ${b.killedBy.name} at ${fmtT(b.deathT)}.` : `Caught by the zone at ${fmtT(b.deathT)}.`;
+    $("fThought").textContent = b.alive ? (b.thought ? `“${b.thought}”` : "") : S.mode === "rush" && S.phase === "fight" ? `Wrecked${b.killedBy ? " by " + b.killedBy.name : ""}. Respawning as v1 with its ${b.cps} checkpoint${b.cps === 1 ? "" : "s"}.` : b.killedBy ? `Wrecked by ${b.killedBy.name} at ${fmtT(b.deathT)}.` : `Caught by the zone at ${fmtT(b.deathT)}.`;
     const key = round + ":" + b.id + ":" + b.history.length;
     if (force || key !== lastEvoKey) { lastEvoKey = key; $("fEvo").innerHTML = b.history.map((h) => `<figure><img src="${h.img}" alt="${esc(b.name)} version ${h.gen}"><figcaption><b>v${h.gen}</b> ${esc(h.reason)}</figcaption></figure>`).join(""); $("fEvo").scrollLeft = 1e5; }
     ui.sponsorName.textContent = b.name;
@@ -1671,6 +1930,11 @@
     b.thinkT = Math.min(b.thinkT, 3.2);
   });
   $("nextRound").addEventListener("click", () => startLobby());
+  ui.modeBtn.addEventListener("click", () => {
+    gameMode = gameMode === "rush" ? "royale" : "rush";
+    if (S.phase === "lobby" || S.phase === "countdown") S.mode = gameMode;
+    updateHud();
+  });
 
   function updateBubble() {
     let b = following && selected !== null ? S.bots[selected] : S.lastThinker;
@@ -1693,13 +1957,19 @@
     if (S.phase === "lobby") {
       ui.phaseLabel.textContent = `ROUND ${round} · LOBBY`;
       ui.alive.innerHTML = `${S.bots.length}/${LOBBY_SIZE}<small>AGENTS IN LOBBY</small>`;
-      big = ""; line = S.bots.length < LOBBY_SIZE ? `Agents joining · ${S.bots.length}/${LOBBY_SIZE}` : "Lobby full";
+      big = ""; line = (S.bots.length < LOBBY_SIZE ? `Agents joining · ${S.bots.length}/${LOBBY_SIZE}` : "Lobby full") + ` · next: ${S.mode === "rush" ? "Checkpoint Rush" : "Last Bot Standing"}`;
     } else if (S.phase === "countdown") {
       ui.phaseLabel.textContent = `ROUND ${round} · GET READY`;
       ui.alive.innerHTML = `${alive}<small>BOTS</small>`;
       big = String(Math.max(1, Math.ceil(S.countT))); line = "Launching to the start line";
+    } else if (S.phase === "fight" && S.mode === "rush") {
+      ui.phaseLabel.textContent = `ROUND ${round} · CHECKPOINT RUSH`;
+      const left = Math.max(0, RUSH_TIME - S.fightT);
+      ui.alive.innerHTML = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")}<small>LEFT</small>`;
+      if (S.fightT < 1.2) big = "GO!";
+      if (left <= 5 && left > 0) big = String(Math.ceil(left));
     } else if (S.phase === "fight") {
-      ui.phaseLabel.textContent = `ROUND ${round} · LIVE`;
+      ui.phaseLabel.textContent = `ROUND ${round} · LAST BOT STANDING`;
       ui.alive.innerHTML = `${alive}<small>BOT${alive === 1 ? "" : "S"} LEFT</small>`;
       if (S.fightT < 1.2) big = "GO!";
     } else {
@@ -1708,7 +1978,20 @@
       $("resTimer").textContent = `Next lobby opens in ${Math.max(0, Math.ceil(S.resT))}s`;
     }
     ui.zoneLine.hidden = S.phase !== "fight";
-    ui.zoneLine.textContent = Z.phase === "shrink" ? `ZONE CLOSING · ${Math.ceil(Z.t)}s` : `ZONE CLOSES IN ${Math.ceil(Z.t)}s`;
+    if (S.mode === "rush") {
+      const lead = S.bots.slice().sort((a, z) => z.cps - a.cps)[0];
+      const shown = S.cps.filter((c) => c.revealed).length;
+      ui.zoneLine.textContent = lead && lead.cps ? `LEADER ${lead.name} · ${lead.cps} ◆ · ${shown} FOUND, ${S.cps.length - shown} HIDDEN` : `${shown} FOUND · ${S.cps.length - shown} HIDDEN`;
+    } else ui.zoneLine.textContent = Z.phase === "shrink" ? `ZONE CLOSING · ${Math.ceil(Z.t)}s` : `ZONE CLOSES IN ${Math.ceil(Z.t)}s`;
+    const rk = S.rules.map((r) => r.id + Math.ceil(r.until - S.fightT)).join();
+    if (rk !== ui.rulesKey) { ui.rulesKey = rk; $("rules").innerHTML = S.phase === "fight" ? S.rules.map((r) => `<span class="rule-chip">${esc(r.name.toUpperCase())} · ${Math.max(0, Math.ceil(r.until - S.fightT))}s</span>`).join("") : ""; }
+    if (S.pick && S.pick.human) {
+      const left = (S.pick.deadline - performance.now()) / 1000;
+      $("pickTime").textContent = `${Math.max(0, Math.ceil(left))} s`;
+      $("pickBar").style.width = clamp(left / 10, 0, 1) * 100 + "%";
+      if (left <= 0) resolvePick(ownerChoice(S.pick.b, S.pick.hand), false);
+    }
+    ui.modeBtn.textContent = `MODE: ${gameMode === "rush" ? "CHECKPOINT RUSH" : "LAST BOT STANDING"}${S.phase === "fight" && S.mode !== gameMode ? " (NEXT ROUND)" : ""}`;
     if (big !== lastCenter) { lastCenter = big; ui.centerBig.textContent = big; ui.centerBig.classList.remove("bump"); void ui.centerBig.offsetWidth; if (big) ui.centerBig.classList.add("bump"); }
     ui.centerLine.textContent = line; ui.centerLine.hidden = !line;
     const b = selected !== null ? S.bots[selected] : null;
