@@ -100,6 +100,9 @@
   .pick-timer div { height: 100%; background: var(--zone); }
   .crew-banner { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); max-width: min(560px, 70%); background: #2b1d16; color: #fff; font-weight: 800; font-size: 14px; padding: 7px 14px; border-radius: 999px; box-shadow: 0 3px 0 rgba(0,0,0,0.18); pointer-events: none; text-align: center; }
   .crew-banner b { color: var(--gold); font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; margin-right: 6px; }
+  .ctrl-chip { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); font: 700 12px var(--mono); letter-spacing: 0.08em; padding: 6px 12px; border-radius: 999px; background: #fff; color: var(--ink); box-shadow: 0 3px 0 rgba(0,0,0,0.14); pointer-events: none; white-space: nowrap; }
+  .ctrl-chip.lost { background: var(--bad); color: #fff; }
+  .ctrl-chip.auto { background: var(--zone); color: #fff; }
   .joy { position: absolute; left: 22px; bottom: 70px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.35); border: 3px solid rgba(255,255,255,0.8); touch-action: none; }
   .joy i { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: #fff; box-shadow: 0 3px 0 rgba(0,0,0,0.2); }
   .ctl.play { background: #2b1d16; color: #fff; }
@@ -270,11 +273,13 @@
         <button class="ctl" type="button" data-speed="4" aria-pressed="false">4×</button>
       </div>
       <button class="ctl play" id="playBtn" type="button" aria-pressed="false">DRIVE A BOT</button>
+      <button class="ctl" id="autoBtn" type="button" aria-pressed="false" hidden>AUTOPILOT WHEN IDLE: OFF</button>
       <button class="ctl" id="modeBtn" type="button">MODE: CHECKPOINT RUSH</button>
       <button class="ctl sponsor" id="sponsorBtn" type="button"><span id="sponsorText">DROP CRATE ON</span> <span id="sponsorName"></span></button>
-      <span class="hint">Drive a bot: WASD / arrows · let go 4 s = autopilot · pit stop every minute</span>
+      <span class="hint">Drive a bot: WASD / arrows to steer · pit stop every minute</span>
     </div>
     <div class="crew-banner" id="crewBanner" hidden></div>
+    <div class="ctrl-chip" id="ctrlChip" hidden></div>
     <div class="joy" id="joy" hidden aria-label="Steering joystick"><i id="joyKnob"></i></div>
     <div class="pit" id="pit" hidden>
       <div class="pit-card">
@@ -1377,7 +1382,7 @@
           if (Math.random() < dt * 14) spark(b.x + rand(-1, 1), rand(0.5, 2), b.z + rand(-1, 1), 3, [0x7fe8ff, 0xffffff], 3);
           if (b.building <= 0 && b.pendingUpgrade) finishBuild(b);
         } else if (b.thinkT <= 0 && S.t - b.lastThink > 0.5 && !orderActive(b) && !(b.human && !b.autopilot)) think(b);
-        if (b.human) { const was = b.autopilot; b.autopilot = !input.active() && performance.now() - input.lastAt > 4000; if (b.autopilot && !was) { b.thinkT = 0; b.thought = "Autopilot: you let go, so I'm driving."; b.thoughtAt = S.t; } if (b.autopilot && b.ms) b.ms.auto += dt; }
+        if (b.human) { const was = b.autopilot; b.autopilot = autoIdle && !input.active() && performance.now() - input.lastAt > 4000; if (!b.autopilot && was) { b.goal = { type: "idle" }; b.detour = null; } if (b.autopilot && !was) { b.thinkT = 0; b.thought = "Autopilot: you let go, so I'm driving."; b.thoughtAt = S.t; } if (b.autopilot && b.ms) b.ms.auto += dt; }
 
         // stuck against scenery? steer around it for a moment (there's no pathfinding)
         const gp = g.type === "hunt" && g.target.alive ? g.target : g.type === "item" ? g.item : g.type === "cp" ? g.cp : g.type === "point" ? g : null;
@@ -1819,16 +1824,21 @@
     else if (held > 8 && (cur.heat || 0) < 1) { focusBot = (best.heat || 0) > 1 ? best : pick(live); focusSince = S.t; }
     return focusBot;
   }
-  let shadowExt = 34;
+  let shadowExt = 34, camFast = false;
   function placeCamera(dt, now) {
     const k = Math.min(1, dt * 2.5);
     const sel = selected !== null ? S.bots[selected] : null;
     let px, py, pz, lx, lz;
     if (following && sel && sel.landed) {
-      const d = 16 * sizeScale(sel.spec.size), a = sel.h + cam.followYaw;
-      const hgt = 7 + (1.2 - cam.phi) * 10;
+      const mine = sel.human && !sel.autopilot;
+      const d = (mine ? 12 : 16) * sizeScale(sel.spec.size), a = sel.h + cam.followYaw;
+      const hgt = (mine ? 5.5 : 7) + (1.2 - cam.phi) * 10;
       px = sel.x - Math.cos(a) * d; pz = sel.z + Math.sin(a) * d; py = hgt + sel.y * 0.5;
-      cam.tx += (sel.x - cam.tx) * k * 1.6; cam.tz += (sel.z - cam.tz) * k * 1.6;
+      const kt = mine ? Math.min(1, dt * 10) : k * 1.6;
+      // look a little ahead of your own bot so you see where you're going
+      const ax = mine ? sel.x + Math.cos(sel.h) * 6 : sel.x, az = mine ? sel.z - Math.sin(sel.h) * 6 : sel.z;
+      cam.tx += (ax - cam.tx) * kt; cam.tz += (az - cam.tz) * kt;
+      camFast = mine;
       lx = cam.tx; lz = cam.tz;
       cam.radius = Math.hypot(d, hgt);
     } else {
@@ -1859,7 +1869,8 @@
       lx = cam.tx; lz = cam.tz;
       if (cut) { camera.position.set(px, py, pz); }
     }
-    camera.position.x += (px - camera.position.x) * k; camera.position.y += (py - camera.position.y) * k; camera.position.z += (pz - camera.position.z) * k;
+    const kp = camFast ? Math.min(1, dt * 7) : k; camFast = false;
+    camera.position.x += (px - camera.position.x) * kp; camera.position.y += (py - camera.position.y) * kp; camera.position.z += (pz - camera.position.z) * kp;
     if (shake > 0 && !reduced) { camera.position.x += rand(-1, 1) * shake; camera.position.y += rand(-1, 1) * shake; }
     shake = Math.max(0, shake - dt * 2);
     camera.lookAt(lx, 0.5, lz);
@@ -2026,7 +2037,7 @@
     if (b.human || (b.agent && b.agent.human)) {
       const c = b.crewLast;
       box.innerHTML = `<div class="brain-h"><b>You drive</b><span>PIT CREW: ${sampleFn ? "CLAUDE" : "SCRIPTED"} · STOP EVERY ${PIT_EVERY} s</span></div>
-        <p class="brain-note">WASD or arrow keys (or the joystick) to steer. Your bot fires on its own when something is in front of it. Let go for 4 s and the autopilot drives.</p>
+        <p class="brain-note">WASD or arrow keys (or the joystick) to steer. Your bot fires on its own when something is in front of it. The autopilot only drives if you switch on "Autopilot when idle".</p>
         ${c ? `<p class="brain-note"><b>Last pit stop (minute ${c.minute}):</b> ${esc(c.review)}${c.applied.length ? ` Built: ${esc(c.applied.join(", "))}.` : ""}${c.tip ? ` Tip: ${esc(c.tip)}` : ""}</p>` : `<p class="brain-note">First pit stop at ${PIT_EVERY} s.</p>`}`;
       return;
     }
@@ -2445,7 +2456,7 @@
 
   /* ================= YOU DRIVE, YOUR AGENT IS THE PIT CREW ================= */
   const PIT_EVERY = 60;
-  let playing = false, sampleFn = null, lastCrewReq = "", crewCtl = null;
+  let playing = false, sampleFn = null, lastCrewReq = "", crewCtl = null, autoIdle = false;
   const freshMs = () => ({ scrap: 0, dealt: 0, taken: 0, cps: 0, wrecks: 0, deaths: 0, dist: 0, auto: 0 });
   const input = { keys: new Set(), joy: { x: 0, y: 0, active: false }, lastAt: -1e9 };
   input.active = () => input.keys.size > 0 || input.joy.active;
@@ -2453,7 +2464,7 @@
   input.turn = () => input.joy.active ? clamp(input.joy.x, -1, 1) : (input.keys.has("right") ? 1 : 0) - (input.keys.has("left") ? 1 : 0);
   const KEYMAP = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
   const typing = (e) => /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || "");
-  window.addEventListener("keydown", (e) => { const k = KEYMAP[e.code]; if (!k || !playing || typing(e) || S.pit) return; e.preventDefault(); input.keys.add(k); input.lastAt = performance.now(); });
+  window.addEventListener("keydown", (e) => { const k = KEYMAP[e.code]; if (!k || !playing || typing(e) || S.pit) return; e.preventDefault(); input.keys.add(k); input.lastAt = performance.now(); const me = S.bots.find((b) => b.human); if (me && (!following || selected !== me.id)) select(me.id, true); });
   window.addEventListener("keyup", (e) => { const k = KEYMAP[e.code]; if (k) { input.keys.delete(k); input.lastAt = performance.now(); } });
   window.addEventListener("blur", () => input.keys.clear());
   (() => {
@@ -2498,8 +2509,24 @@
     updateHud();
   });
 
+  $("autoBtn").addEventListener("click", () => { autoIdle = !autoIdle; $("autoBtn").setAttribute("aria-pressed", String(autoIdle)); $("autoBtn").textContent = `AUTOPILOT WHEN IDLE: ${autoIdle ? "ON" : "OFF"}`; });
   function ui_crew() {
     const me = S.bots.find((b) => b.human);
+    $("autoBtn").hidden = !playing;
+    const chip = $("ctrlChip");
+    if (playing && me && S.phase === "fight") {
+      let t = "YOU'RE DRIVING", c = "";
+      if (S.pit) t = "PIT STOP";
+      else if (!me.alive) { t = `WRECKED · RESPAWN IN ${Math.max(0, Math.ceil(me.respawnT))} s`; c = "lost"; }
+      else if (!me.landed) { t = "DROPPING IN"; c = "lost"; }
+      else if (me.air > 0) { t = "FLIPPED! NO CONTROL"; c = "lost"; }
+      else if (me.stun > 0) { t = `STUNNED · ${me.stun.toFixed(1)} s`; c = "lost"; }
+      else if (me.autopilot) { t = "AUTOPILOT · PRESS A KEY TO DRIVE"; c = "auto"; }
+      else if (!input.active()) t = "YOU'RE DRIVING · W / ↑ TO GO";
+      if (chip.textContent !== t) chip.textContent = t;
+      chip.className = "ctrl-chip" + (c ? " " + c : "");
+      chip.hidden = false;
+    } else chip.hidden = true;
     $("joy").hidden = !(playing && me && S.phase === "fight" && !S.pit);
     const tip = me && S.crewTip && S.phase === "fight" && !S.pit;
     $("crewBanner").hidden = !tip;
