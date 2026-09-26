@@ -98,6 +98,30 @@
   .card-btn span { font-size: 13px; }
   .pick-timer { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
   .pick-timer div { height: 100%; background: var(--zone); }
+  .crew-banner { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); max-width: min(560px, 70%); background: #2b1d16; color: #fff; font-weight: 800; font-size: 14px; padding: 7px 14px; border-radius: 999px; box-shadow: 0 3px 0 rgba(0,0,0,0.18); pointer-events: none; text-align: center; }
+  .crew-banner b { color: var(--gold); font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; margin-right: 6px; }
+  .joy { position: absolute; left: 22px; bottom: 70px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.35); border: 3px solid rgba(255,255,255,0.8); touch-action: none; }
+  .joy i { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: #fff; box-shadow: 0 3px 0 rgba(0,0,0,0.2); }
+  .ctl.play { background: #2b1d16; color: #fff; }
+  .ctl.play[aria-pressed="true"] { background: var(--gold); color: #2b1d16; }
+  .pit { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(43, 29, 22, 0.35); }
+  .pit-card { background: #fff; border-radius: 18px; padding: 18px; width: min(620px, 100%); max-height: calc(100% - 20px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 8px 0 rgba(0,0,0,0.15); animation: pop .35s cubic-bezier(.3,1.5,.5,1); }
+  .pit-card h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 30px; line-height: 1; }
+  .pit-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0; }
+  .pit-stats div { background: var(--panel-2); border-radius: 10px; padding: 5px 8px; }
+  .pit-stats dt { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-soft); text-transform: uppercase; }
+  .pit-stats dd { margin: 0; font-family: var(--mono); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .pit-ask { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pit-ask input { flex: 1 1 220px; min-width: 0; font: 700 15px var(--body); color: var(--ink); background: var(--panel-2); border: 2px solid transparent; border-radius: 10px; padding: 8px 10px; }
+  .pit-ask input:focus { outline: none; border-color: var(--gold); }
+  .pit-review { margin: 0; padding: 10px 12px; background: #efe6ff; border-radius: 10px; font-size: 15px; font-weight: 700; color: #2b1d16; }
+  .pit-review b { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: #6b4bb3; text-transform: uppercase; margin-bottom: 2px; }
+  .pit-ups { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pit-ups figure { margin: 0; width: 110px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; }
+  .pit-ups img { width: 110px; height: 82px; border-radius: 8px; background: var(--panel-2); }
+  .pit-tip { margin: 0; font-weight: 800; font-size: 16px; }
+  .pit-tip span { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); letter-spacing: 0.1em; margin-right: 6px; }
+  @media (max-width: 640px) { .pit-stats { grid-template-columns: repeat(2, 1fr); } .joy { bottom: 110px; } }
   .results { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(43, 29, 22, 0.28); }
   .res-card { background: #fff; border-radius: 18px; padding: 20px; max-width: 540px; width: 100%; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 0 rgba(0,0,0,0.15); animation: pop .4s cubic-bezier(.3,1.5,.5,1); }
   .res-card h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(26px, 5vw, 38px); line-height: 1.05; }
@@ -245,9 +269,28 @@
         <button class="ctl" type="button" data-speed="2" aria-pressed="false">2×</button>
         <button class="ctl" type="button" data-speed="4" aria-pressed="false">4×</button>
       </div>
+      <button class="ctl play" id="playBtn" type="button" aria-pressed="false">DRIVE A BOT</button>
       <button class="ctl" id="modeBtn" type="button">MODE: CHECKPOINT RUSH</button>
       <button class="ctl sponsor" id="sponsorBtn" type="button"><span id="sponsorText">DROP CRATE ON</span> <span id="sponsorName"></span></button>
-      <span class="hint">Follow a bot to back it: when it captures a checkpoint, you pick the rule</span>
+      <span class="hint">Drive a bot: WASD / arrows · let go 4 s = autopilot · pit stop every minute</span>
+    </div>
+    <div class="crew-banner" id="crewBanner" hidden></div>
+    <div class="joy" id="joy" hidden aria-label="Steering joystick"><i id="joyKnob"></i></div>
+    <div class="pit" id="pit" hidden>
+      <div class="pit-card">
+        <h2 id="pitLabel">Pit stop</h2>
+        <h3>PIT STOP</h3>
+        <dl class="pit-stats" id="pitStats"></dl>
+        <div id="pitAskWrap">
+          <label class="lbl" for="crewAsk" style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--ink-soft);text-transform:uppercase">Anything for your crew?</label>
+          <div class="pit-ask"><input id="crewAsk" maxlength="140" placeholder="e.g. make me faster, I keep getting flipped"><button class="btn" id="crewSend" type="button">SEND</button></div>
+          <p class="note" id="pitAskNote"></p>
+        </div>
+        <p class="pit-review" id="pitReview" hidden><b id="pitWho">Crew chief</b><span id="pitReviewTxt"></span></p>
+        <div class="pit-ups" id="pitUps"></div>
+        <p class="pit-tip" id="pitTip" hidden></p>
+        <div class="res-row"><button class="btn" id="pitGo" type="button" hidden>BACK TO THE TRACK</button><span class="note" id="pitTimer"></span></div>
+      </div>
     </div>
     <div class="results" id="results" hidden>
       <div class="res-card">
@@ -828,12 +871,14 @@
     g.clearRect(0, 0, 256, 64);
     g.fillStyle = "rgba(0,0,0,0.12)"; roundRect(g, 8, 8, 240, 52, 24); g.fill();
     g.fillStyle = "#ffffff"; roundRect(g, 8, 4, 240, 52, 24); g.fill();
+    if (b.human) { g.strokeStyle = "#ffb703"; g.lineWidth = 6; roundRect(g, 10, 6, 236, 48, 22); g.stroke(); }
     if (b.external) { g.strokeStyle = "#7b3fe4"; g.lineWidth = 5; roundRect(g, 10, 6, 236, 48, 22); g.stroke(); }
     g.fillStyle = hexStr(b.color); g.beginPath(); g.arc(32, 22, 9, 0, 7); g.fill();
     g.font = "800 22px 'Nunito', 'Segoe UI', sans-serif"; g.fillStyle = "#2b1d16"; g.textBaseline = "middle";
     g.fillText(b.name, 48, 23);
     g.font = "700 17px 'JetBrains Mono', monospace"; g.fillStyle = "#8a6a58"; g.textAlign = "right";
-    if (b.external) { g.fillStyle = "#7b3fe4"; g.fillText(b.brain ? "brain v" + (b.brain.version || "?") : "no brain", 232, 23); }
+    if (b.human) { g.fillStyle = "#c48a00"; g.fillText(b.autopilot ? "autopilot" : "you drive", 232, 23); }
+    else if (b.external) { g.fillStyle = "#7b3fe4"; g.fillText(b.brain ? "brain v" + (b.brain.version || "?") : "no brain", 232, 23); }
     else g.fillText("v" + b.gen, 232, 23);
     g.textAlign = "left";
     const r = clamp(b.hp / b.maxHp, 0, 1);
@@ -901,7 +946,7 @@
     resetProps();
     round++;
     selected = null;
-    const ext = AGENTS.filter((a) => a.external && extSeats[a.name]);
+    const ext = AGENTS.filter((a) => (a.external && extSeats[a.name]) || (a.human && playing));
     const roster = [...ext, ...AGENTS.filter((a) => !a.external).sort(() => Math.random() - 0.5)].slice(0, LOBBY_SIZE).sort(() => Math.random() - 0.5);
     S = {
       phase: "lobby", t: 0, fightT: 0, bots: [], items: [], shots: [], queue: roster, joinT: 0.4, countT: 0, resT: 0,
@@ -911,7 +956,7 @@
     setZoneVisible(false);
     ui.results.hidden = true;
     ui.killfeed.innerHTML = "";
-    $("pick").hidden = true; $("rules").innerHTML = "";
+    $("pick").hidden = true; $("rules").innerHTML = ""; $("pit").hidden = true; $("crewBanner").hidden = true;
     feed(null, `Round ${round} lobby is open. Waiting for ${LOBBY_SIZE} agents.`, "zone");
     renderStandings(true);
     setFollow(false);
@@ -926,7 +971,7 @@
       if (!obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 2) && !(S.bots.some((b) => Math.hypot(b.x - x, b.z - z) < 3))) break;
     }
     const b = {
-      id: S.bots.length, agent, name: agent.name, color: agent.color, instr: agent.instr, external: !!agent.external, orderUntil: 0, rulePrefs: agent.rulePrefs || null,
+      id: S.bots.length, agent, name: agent.name, color: agent.color, instr: agent.instr, external: !!agent.external, human: !!agent.human, autopilot: false, ms: agent.human ? freshMs() : null, orderUntil: 0, rulePrefs: agent.rulePrefs || null,
       aggr: agent.aggr, caution: agent.caution, greed: agent.greed, build: agent.build, mode: agent.mode, favor: agent.favor, crates: agent.crates,
       pref: agent.pref === "copy" ? (lastWinnerWeapon || "saw") : agent.pref,
       spec, gen: 1, x, z, h: rand(-Math.PI, Math.PI), y: 16, vy: 0, landed: false,
@@ -945,6 +990,7 @@
     b.thoughtAt = S.t;
     S.bots.push(b);
     if (selected === null) selected = 0;
+    if (b.human) setTimeout(() => { if (S.bots.includes(b)) select(b.id, true); }, 50);
     feed(b, `joined the lobby (${S.bots.length}/${LOBBY_SIZE}). ${mem ? "Lesson: " + esc(mem.lesson) : esc(b.thought)}`, "join");
     S.lastThinker = b;
   }
@@ -1120,7 +1166,7 @@
     } else if (near && near.d < 16 && pct(b) < b.caution * 100 && power(near.o) > power(b) * 0.7) {
       goal = { type: "flee", from: near.o };
       text = `I'm at ${pct(b)}% and ${near.o.name} has a ${WEAPONS[near.o.spec.weapon].name.toLowerCase()}. Backing off.`;
-    } else if (b.scrap >= cost(b) && !ruleOn("freeze") && (!near || near.d > 14) && Math.random() < 0.6 + b.build * 0.4 && !(S.mode === "rush" && nearCp(b, 12))) {
+    } else if (!b.human && b.scrap >= cost(b) && !ruleOn("freeze") && (!near || near.d > 14) && Math.random() < 0.6 + b.build * 0.4 && !(S.mode === "rush" && nearCp(b, 12))) {
       const up = chooseUpgrade(b);
       goal = { type: "build" }; b.pendingUpgrade = up; b.building = 1.6;
       text = `${b.scrap} scrap, enough for an upgrade. ${up.reason}`;
@@ -1229,6 +1275,7 @@
   function dealDamage(att, tgt, dmg, st) {
     if (!tgt.alive) return;
     if (ruleOn("glass")) dmg *= 2;
+    if (att.ms) att.ms.dealt += dmg; if (tgt.ms) tgt.ms.taken += dmg;
     tgt.hp -= dmg; tgt.dmgSinceBuild += dmg; tgt.lastHitBy = att; tgt.lastHitAt = S.t;
     att.heat = (att.heat || 0) + dmg * 0.5 + 2; tgt.heat = (tgt.heat || 0) + dmg * 0.5 + 2;
     att.dmgDealt += dmg;
@@ -1247,7 +1294,7 @@
 
   function kill(b, by) {
     b.alive = false; b.hp = 0; b.deathT = S.fightT; b.killedBy = by; b.killedWith = by ? by.spec.weapon : null;
-    b.deaths++;
+    b.deaths++; if (b.ms) b.ms.deaths++;
     if (b.brain) b.deathLog.push({ at: Math.round(S.fightT), by: by ? by.name : "zone", weapon: by ? by.spec.weapon : null, build: describe(b.spec) });
     if (S.mode === "rush") b.respawnT = 4; else S.placements.unshift(b);
     const drop = 3 + b.gen * 2 + Math.floor(b.scrap / 2);
@@ -1263,7 +1310,7 @@
     const bw = by ? `<b style="color:${hexStr(by.color)}">${by.name}</b>` : "";
     const vw = `<b style="color:${hexStr(b.color)}">${b.name}</b>`;
     if (by) {
-      by.kills++; by.agent.wrecks++;
+      by.kills++; by.agent.wrecks++; if (by.ms) by.ms.wrecks++;
       killFeed(`${bw} wrecked ${vw}`);
       feed(by, `wrecked ${vw} with a ${esc(WEAPONS[by.spec.weapon].name.toLowerCase())}. ${drop} scrap on the ground.${S.mode === "rush" ? ` ${esc(b.name)} respawns as v1 in 4 s.` : ""}`, "kill");
       by.thinkT = Math.min(by.thinkT, 0.4);
@@ -1329,7 +1376,8 @@
           b.building -= dt;
           if (Math.random() < dt * 14) spark(b.x + rand(-1, 1), rand(0.5, 2), b.z + rand(-1, 1), 3, [0x7fe8ff, 0xffffff], 3);
           if (b.building <= 0 && b.pendingUpgrade) finishBuild(b);
-        } else if (b.thinkT <= 0 && S.t - b.lastThink > 0.5 && !orderActive(b)) think(b);
+        } else if (b.thinkT <= 0 && S.t - b.lastThink > 0.5 && !orderActive(b) && !(b.human && !b.autopilot)) think(b);
+        if (b.human) { const was = b.autopilot; b.autopilot = !input.active() && performance.now() - input.lastAt > 4000; if (b.autopilot && !was) { b.thinkT = 0; b.thought = "Autopilot: you let go, so I'm driving."; b.thoughtAt = S.t; } if (b.autopilot && b.ms) b.ms.auto += dt; }
 
         // stuck against scenery? steer around it for a moment (there's no pathfinding)
         const gp = g.type === "hunt" && g.target.alive ? g.target : g.type === "item" ? g.item : g.type === "cp" ? g.cp : g.type === "point" ? g : null;
@@ -1345,7 +1393,9 @@
             b.lastGoalD = d;
           } else b.lastGoalD = undefined;
         }
-        if (b.detour && b.stun <= 0 && b.building <= 0) {
+        if (b.human && !b.autopilot) {
+          if (b.stun <= 0) moved = manualDrive(b, dt);
+        } else if (b.detour && b.stun <= 0 && b.building <= 0) {
           b.detour.t -= dt;
           moved = steerTo(b, b.detour.x, b.detour.z, dt, 0.5);
           if (b.detour.t <= 0 || moved === 0) b.detour = null;
@@ -1372,6 +1422,7 @@
         if (b.cd <= 0 && b.stun <= 0 && b.building <= 0 && b.goal.type !== "flee") {
           let tgt = null;
           if (b.goal.type === "hunt" && b.goal.target.alive && dist(b, b.goal.target) <= b.st.range + b.goal.target.r * 0.5) tgt = b.goal.target;
+          if (!tgt && b.human && b.st.ranged) { let best = null; for (const o of alive) { if (o === b || !o.alive || o.hop) continue; const d = dist(b, o), f = Math.abs(wrapA(Math.atan2(-(o.z - b.z), o.x - b.x) - b.h)); if (d <= b.st.range && f < 0.35 && (!best || d < best.d)) best = { o, d }; } if (best) tgt = best.o; }
           if (!tgt && !b.st.ranged && S.fightT > 20) for (const o of alive) if (o !== b && o.alive && !o.hop && dist(b, o) <= b.st.range + o.r * 0.3) { tgt = o; break; }
           if (tgt) {
             const facing = Math.abs(wrapA(Math.atan2(-(tgt.z - b.z), tgt.x - b.x) - b.h));
@@ -1393,6 +1444,7 @@
           if (it.kind === "crate" && !it.landed) continue;
           if (Math.hypot(it.x - b.x, it.z - b.z) < b.r + 0.6) {
             b.scrap += it.heal ? it.value : it.value * (ruleOn("double") ? 2 : 1);
+            if (b.ms) b.ms.scrap += it.heal ? it.value : it.value * (ruleOn("double") ? 2 : 1);
             if (it.heal) { b.hp = Math.min(b.maxHp, b.hp + it.heal); drawLabel(b); spark(it.x, 1, it.z, 25, [0x22a867, 0xffffff], 5); feed(b, `opened a supply crate: +${it.value} scrap, +${it.heal} HP.`, "drop"); }
             else spark(it.x, 0.6, it.z, 4, 0xffd166, 3);
             dyn.remove(it.mesh); S.items.splice(i, 1);
@@ -1400,6 +1452,7 @@
         }
       }
       b.moved += moved; b.v = moved / dt;
+      if (b.ms && fighting) b.ms.dist += moved;
       if (b.brain && fighting) { const k = b.building > 0 ? "build" : b.goal.type; b.goalTime[k] = (b.goalTime[k] || 0) + dt; }
       // dust trail
       b.dustT -= dt;
@@ -1458,6 +1511,8 @@
       }
     } else if (S.phase === "fight") {
       S.fightT += dt;
+      const me = S.bots.find((b) => b.human);
+      if (me && !S.pit && S.fightT >= (S.nextPit || PIT_EVERY) && (S.mode !== "rush" || S.fightT < RUSH_TIME - 12)) { S.nextPit = (S.nextPit || PIT_EVERY) + PIT_EVERY; startPit(me); }
       if (turnLength() > 0 && S.bots.some((b) => b.external)) { S.turnT = (S.turnT == null ? turnLength() : S.turnT) - dt; if (S.turnT <= 0 && !S.waiting) beginWait(); }
       if (S.mode === "rush") {
         updateCheckpoints(dt);
@@ -1530,6 +1585,7 @@
   function finishRound(order) {
     const w = order[0];
     S.finalOrder = order;
+    if (S.pit) { S.pit = null; $("pit").hidden = true; }
     if (S.waiting) S.waiting = null;
     setTimeout(() => S.bots.filter((b) => b.external).forEach((b) => writeReport(b.name, "round-over")), 50);
     S.phase = "results"; S.winner = w; S.resT = 10; S.pick = null; $("pick").hidden = true;
@@ -1627,7 +1683,7 @@
     }
   }
   function captureCp(cp, b) {
-    b.cps++;
+    b.cps++; if (b.ms) b.ms.cps++;
     if (b.brain) b.capLog.push(Math.round(S.fightT));
     S.cps.splice(S.cps.indexOf(cp), 1);
     dyn.remove(cp.g);
@@ -1899,7 +1955,7 @@
       if (r.imgSrc !== img) { r.img.src = img; r.imgSrc = img; }
       r.ver.textContent = "v" + b.gen;
       const status = b.alive ? describe(b.spec) : S.mode === "rush" ? `Wrecked · back in ${Math.max(0, Math.ceil(b.respawnT))} s` : b.killedBy ? `Wrecked by ${b.killedBy.name}` : "Caught by the zone";
-      r.sub.textContent = (b.external ? `AGENT · ${b.brain ? "brain v" + (b.brain.version || "?") : "default brain"} · ` : "") + status;
+      r.sub.textContent = (b.human ? "YOU DRIVE · " : "") + (b.external ? `AGENT · ${b.brain ? "brain v" + (b.brain.version || "?") : "default brain"} · ` : "") + status;
       r.bar.style.width = f * 100 + "%";
       r.bar.style.background = f > 0.5 ? "var(--good)" : f > 0.25 ? "var(--gold)" : "var(--bad)";
       r.k.textContent = S.mode === "rush" ? `${b.cps} ◆ · ${b.kills} wr` : `${b.kills} wreck${b.kills === 1 ? "" : "s"}`;
@@ -1943,7 +1999,7 @@
     $("fVer").textContent = "v" + b.gen;
     const st = $("fState");
     st.className = "who-state" + (b.alive ? "" : " dead");
-    st.textContent = !b.alive ? (S.mode === "rush" && S.phase === "fight" ? `RESPAWN IN ${Math.max(0, Math.ceil(b.respawnT))}s` : "WRECKED") : S.phase === "results" ? "WINNER" : S.phase !== "fight" ? (b.landed ? "IN LOBBY" : "DROPPING IN") : b.building > 0 ? "REBUILDING" : ({ hunt: "HUNTING", flee: "RETREATING", item: "SCAVENGING", zone: "OUTRUNNING ZONE", point: S.mode === "rush" ? "EXPLORING" : "MOVING", build: "REBUILDING", idle: "THINKING", cp: "CAPTURING" })[b.goal.type] || "";
+    st.textContent = b.human && b.alive && S.phase === "fight" ? (S.pit ? "IN THE PIT" : b.autopilot ? "AUTOPILOT" : "YOU'RE DRIVING") : !b.alive ? (S.mode === "rush" && S.phase === "fight" ? `RESPAWN IN ${Math.max(0, Math.ceil(b.respawnT))}s` : "WRECKED") : S.phase === "results" ? "WINNER" : S.phase !== "fight" ? (b.landed ? "IN LOBBY" : "DROPPING IN") : b.building > 0 ? "REBUILDING" : ({ hunt: "HUNTING", flee: "RETREATING", item: "SCAVENGING", zone: "OUTRUNNING ZONE", point: S.mode === "rush" ? "EXPLORING" : "MOVING", build: "REBUILDING", idle: "THINKING", cp: "CAPTURING" })[b.goal.type] || "";
     $("fInstr").textContent = b.instr;
     const mem = b.agent.memory;
     $("fLessonWrap").hidden = !mem; if (mem) $("fLesson").textContent = mem.lesson;
@@ -1963,10 +2019,17 @@
   function renderBrainBox(b) {
     const box = $("fBrain");
     const hits = b.ruleHits || {};
-    const key = [b.id, round, b.external, b.brain && b.brain.version, b.brain && b.brain.key, b.lastRule, b.planIdx, JSON.stringify(hits)].join("|");
+    const key = [b.id, round, b.external, b.human, b.crewLast && b.crewLast.minute, b.brain && b.brain.version, b.brain && b.brain.key, b.lastRule, b.planIdx, JSON.stringify(hits)].join("|");
     if (key === lastBrainKey) return;
     lastBrainKey = key;
     const dial = (v) => (Math.round(v * 100) / 100).toFixed(2);
+    if (b.human || (b.agent && b.agent.human)) {
+      const c = b.crewLast;
+      box.innerHTML = `<div class="brain-h"><b>You drive</b><span>PIT CREW: ${sampleFn ? "CLAUDE" : "SCRIPTED"} · STOP EVERY ${PIT_EVERY} s</span></div>
+        <p class="brain-note">WASD or arrow keys (or the joystick) to steer. Your bot fires on its own when something is in front of it. Let go for 4 s and the autopilot drives.</p>
+        ${c ? `<p class="brain-note"><b>Last pit stop (minute ${c.minute}):</b> ${esc(c.review)}${c.applied.length ? ` Built: ${esc(c.applied.join(", "))}.` : ""}${c.tip ? ` Tip: ${esc(c.tip)}` : ""}</p>` : `<p class="brain-note">First pit stop at ${PIT_EVERY} s.</p>`}`;
+      return;
+    }
     if (!b.brain) {
       const who = b.external ? `Default template: ${esc(b.name)} hasn't sent a brain, so it runs the house brain with neutral dials.` : "House brain (scripted), the same rules every house bot uses.";
       box.innerHTML = `<div class="brain-h"><b>${b.external ? "Default brain" : "House brain"}</b><span>SCRIPTED</span></div><p class="brain-note">${who}</p>
@@ -2072,6 +2135,7 @@
     }
     ui.modeBtn.textContent = `MODE: ${gameMode === "rush" ? "CHECKPOINT RUSH" : "LAST BOT STANDING"}${S.phase === "fight" && S.mode !== gameMode ? " (NEXT ROUND)" : ""}`;
     if (big !== lastCenter) { lastCenter = big; ui.centerBig.textContent = big; ui.centerBig.classList.remove("bump"); void ui.centerBig.offsetWidth; if (big) ui.centerBig.classList.add("bump"); }
+    ui_crew();
     if (S.waiting) line = `Waiting for ${S.waiting.names.filter((n) => !S.waiting.got.has(n)).join(", ")}'s orders · turn ${S.turnN} · ${Math.max(0, Math.ceil((90000 - (performance.now() - S.waiting.since)) / 1000))} s`;
     ui.centerLine.textContent = line; ui.centerLine.hidden = !line;
     refreshAgentNote();
@@ -2379,13 +2443,173 @@
     }, (e) => agentNote(`Mailbox disconnected (${e.code}). Reload to reconnect.`));
   })();
 
+  /* ================= YOU DRIVE, YOUR AGENT IS THE PIT CREW ================= */
+  const PIT_EVERY = 60;
+  let playing = false, sampleFn = null, lastCrewReq = "", crewCtl = null;
+  const freshMs = () => ({ scrap: 0, dealt: 0, taken: 0, cps: 0, wrecks: 0, deaths: 0, dist: 0, auto: 0 });
+  const input = { keys: new Set(), joy: { x: 0, y: 0, active: false }, lastAt: -1e9 };
+  input.active = () => input.keys.size > 0 || input.joy.active;
+  input.throttle = () => input.joy.active ? clamp(-input.joy.y, -1, 1) : (input.keys.has("up") ? 1 : 0) - (input.keys.has("down") ? 1 : 0);
+  input.turn = () => input.joy.active ? clamp(input.joy.x, -1, 1) : (input.keys.has("right") ? 1 : 0) - (input.keys.has("left") ? 1 : 0);
+  const KEYMAP = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
+  const typing = (e) => /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || "");
+  window.addEventListener("keydown", (e) => { const k = KEYMAP[e.code]; if (!k || !playing || typing(e) || S.pit) return; e.preventDefault(); input.keys.add(k); input.lastAt = performance.now(); });
+  window.addEventListener("keyup", (e) => { const k = KEYMAP[e.code]; if (k) { input.keys.delete(k); input.lastAt = performance.now(); } });
+  window.addEventListener("blur", () => input.keys.clear());
+  (() => {
+    const joy = $("joy"), knob = $("joyKnob");
+    const setK = (x, y) => { knob.style.transform = `translate(${x * 35}px, ${y * 35}px)`; };
+    const move = (e) => { const r = joy.getBoundingClientRect(); let x = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), y = (e.clientY - (r.top + r.height / 2)) / (r.height / 2); const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } input.joy.x = x; input.joy.y = y; input.lastAt = performance.now(); setK(x, y); };
+    joy.addEventListener("pointerdown", (e) => { input.joy.active = true; joy.setPointerCapture(e.pointerId); move(e); });
+    joy.addEventListener("pointermove", (e) => { if (input.joy.active) move(e); });
+    const up = () => { input.joy.active = false; input.joy.x = input.joy.y = 0; input.lastAt = performance.now(); setK(0, 0); };
+    joy.addEventListener("pointerup", up); joy.addEventListener("pointercancel", up);
+  })();
+
+  function manualDrive(b, dt) {
+    const th = input.throttle(), tu = input.turn();
+    const rate = b.spec.loco === "hover" ? 3.4 : b.spec.loco === "treads" ? 2.1 : 2.7;
+    b.h -= tu * rate * dt; b.turn = -tu * rate;
+    const want = b.st.speed * (ruleOn("turbo") ? 1.4 : 1) * (th >= 0 ? th : th * 0.6);
+    b.mv = (b.mv || 0) + (want - (b.mv || 0)) * Math.min(1, dt * 5);
+    const step = b.mv * dt;
+    b.x += Math.cos(b.h) * step; b.z -= Math.sin(b.h) * step;
+    return Math.abs(step);
+  }
+
+  function humanAgent() {
+    let a = AGENTS.find((x) => x.human);
+    if (!a) { a = { name: "YOU", color: 0x2b1d16, instr: "Driven by you. Your agent is the pit crew.", aggr: 0.5, caution: 0.45, greed: 0.7, build: 0.7, pref: "saw", mode: "nearest", human: true, wins: 0, points: 0, rounds: 0, wrecks: 0, cps: 0, memory: null }; AGENTS.push(a); }
+    return a;
+  }
+  $("playBtn").addEventListener("click", () => {
+    playing = !playing;
+    $("playBtn").setAttribute("aria-pressed", String(playing));
+    $("playBtn").textContent = playing ? "STOP DRIVING" : "DRIVE A BOT";
+    const a = humanAgent();
+    if (playing) {
+      if (S.phase === "lobby" && !S.bots.some((b) => b.agent === a) && !S.queue.includes(a)) { if (S.bots.length + S.queue.length >= LOBBY_SIZE) S.queue.pop(); S.queue.unshift(a); }
+      else if (!S.bots.some((b) => b.agent === a)) feed(null, "You'll drive in the next round. Pit stops every minute of game time.", "zone");
+      const me = S.bots.find((b) => b.human); if (me) select(me.id, true);
+    } else {
+      const me = S.bots.find((b) => b.human); if (me) { me.human = false; me.autopilot = false; drawLabel(me); }
+      input.keys.clear();
+    }
+    updateHud();
+  });
+
+  function ui_crew() {
+    const me = S.bots.find((b) => b.human);
+    $("joy").hidden = !(playing && me && S.phase === "fight" && !S.pit);
+    const tip = me && S.crewTip && S.phase === "fight" && !S.pit;
+    $("crewBanner").hidden = !tip;
+    if (tip) { const html = `<b>CREW</b>${esc(S.crewTip)}`; if ($("crewBanner")._h !== html) { $("crewBanner").innerHTML = html; $("crewBanner")._h = html; } }
+    if (me && me.label && me._lblAuto !== me.autopilot) { me._lblAuto = me.autopilot; drawLabel(me); }
+    if (S.pit) pitTick();
+  }
+
+  const UPGRADE_IDS = ["armor", "weapon:saw", "weapon:ram", "weapon:hammer", "weapon:spinner", "weapon:flipper", "weapon:cannon", "weapon-level", "loco:wheels6", "loco:hover", "loco:treads", "chassis:wedge", "chassis:dome", "chassis:tank", "size", "scanner"];
+  function startPit(me) {
+    input.keys.clear();
+    const st = { ...me.ms };
+    S.pit = { bot: me, minute: Math.max(1, Math.round(S.fightT / 60)), stage: "ask", askUntil: performance.now() + 8000, stats: st };
+    $("pitLabel").textContent = `Pit stop · after minute ${S.pit.minute} · round ${round}`;
+    const cell = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+    $("pitStats").innerHTML = cell("Scrap picked up", st.scrap) + cell("Scrap to spend", me.alive ? me.scrap : 0) + cell("Checkpoints", `${st.cps} (${me.cps} total)`) + cell("Damage dealt", Math.round(st.dealt))
+      + cell("Damage taken", Math.round(st.taken)) + cell("Wrecks / deaths", `${st.wrecks} / ${st.deaths}`) + cell("Distance", Math.round(st.dist) + " m") + cell("On autopilot", Math.round(st.auto) + " s");
+    $("pitAskWrap").hidden = false; $("crewAsk").value = lastCrewReq; $("pitReview").hidden = true; $("pitUps").innerHTML = ""; $("pitTip").hidden = true; $("pitGo").hidden = true;
+    $("pit").hidden = false;
+    feed(null, `Pit stop after minute ${S.pit.minute}. The race is paused while your crew works.`, "zone");
+    setTimeout(() => $("crewAsk").focus({ preventScroll: true }), 50);
+  }
+  function pitTick() {
+    const P = S.pit, now = performance.now();
+    if (P.stage === "ask") { const left = Math.ceil((P.askUntil - now) / 1000); $("pitAskNote").textContent = `Your crew starts in ${Math.max(0, left)} s. Type a request or press Send.`; if (now >= P.askUntil) crewDecide(); }
+    else if (P.stage === "deciding") { $("pitTimer").textContent = `Crew working… ${Math.round((now - P.decideAt) / 1000)} s`; if (now - P.decideAt > 25000 && crewCtl) crewCtl.abort(); }
+    else if (P.stage === "done") { const left = Math.ceil((P.resumeAt - now) / 1000); $("pitTimer").textContent = `Back on track in ${Math.max(0, left)} s`; if (now >= P.resumeAt) endPit(); }
+  }
+  $("crewSend").addEventListener("click", () => { if (S.pit && S.pit.stage === "ask") crewDecide(); });
+  $("crewAsk").addEventListener("keydown", (e) => { if (e.key === "Enter" && S.pit && S.pit.stage === "ask") crewDecide(); });
+  $("crewAsk").addEventListener("input", () => { if (S.pit && S.pit.stage === "ask") S.pit.askUntil = Math.max(S.pit.askUntil, performance.now() + 6000); });
+  $("pitGo").addEventListener("click", () => endPit());
+
+  function crewPrompt(me, req) {
+    const s = me.spec, c = cost(me);
+    const top = S.bots.slice().sort((p, q) => q.cps - p.cps || q.kills - p.kills).slice(0, 5).map((o) => `${o.name} ${o.cps} checkpoints`).join(", ");
+    const m = S.pit.stats;
+    return `You are the pit crew chief for a human player's robot in Scrap Royale, a 3D robot battle game. Mode: ${S.mode === "rush" ? `Checkpoint Rush (most checkpoints captured in ${RUSH_TIME / 60} minutes wins; wrecked robots respawn as a plain box but keep their checkpoints)` : "Last Bot Standing"}. The player steers; you upgrade the robot and coach them. This is the pit stop after minute ${S.pit.minute}${S.mode === "rush" ? `, ${Math.round(RUSH_TIME - S.fightT)} s left` : ""}.
+The player says to the crew: "${String(req || "(nothing)").slice(0, 140)}"
+Robot now: ${describe(s)}. Health ${pct(me)}%. Scrap to spend: ${me.alive ? me.scrap : 0}. The next upgrade costs ${c}, then ${c + 1}, then ${c + 2}, and so on.
+Upgrade ids (use exactly these): armor (now ${s.armor}/3), weapon:saw|ram|hammer|spinner|flipper|cannon (now ${s.weapon}), weapon-level (now Mk${s.wlvl}/3, needs a weapon), loco:wheels6|hover|treads (now ${s.loco}; hover fastest, treads toughest), chassis:wedge|dome|tank (now ${s.chassis}; wedge can't be flipped), size (now ${s.size}/3), scanner (now ${s.scanner || 0}/2, spots hidden checkpoints further away).
+Their last minute: picked up ${m.scrap} scrap, captured ${m.cps} checkpoints (${me.cps} total), dealt ${Math.round(m.dealt)} damage, took ${Math.round(m.taken)}, wrecked ${m.wrecks}, died ${m.deaths}, drove ${Math.round(m.dist)} m, ${Math.round(m.auto)} s on autopilot (hands off).
+Leaders: ${top}. Active rules: ${S.rules.map((r) => r.name).join(", ") || "none"}${ruleOn("freeze") ? " (build freeze: no upgrades possible)" : ""}.
+Reply with only JSON: {"review":"2-3 short, specific sentences to the player about their last minute","upgrades":["id", ...in order, only as many as the scrap covers],"tip":"one instruction for the next minute, at most 12 words"}`;
+  }
+  function scriptedCrew(me, req) {
+    const s = me.spec, m = S.pit.stats, r = String(req || "").toLowerCase(), ups = [];
+    const wantW = ["saw", "ram", "hammer", "spinner", "flipper", "cannon"].find((w) => r.includes(w));
+    if (s.weapon === "none") ups.push("weapon:" + (wantW || "saw"));
+    if (/fast|speed|quick/.test(r)) ups.push(s.loco === "wheels4" ? "loco:wheels6" : "loco:hover");
+    if (/flip/.test(r) || me.flipped > 0) ups.push("chassis:wedge");
+    if (/tough|armou?r|tank|die/.test(r) || m.taken > m.dealt * 1.5 + 20) ups.push("armor");
+    if (m.cps === 0 && (s.scanner || 0) < 2) ups.push("scanner");
+    ups.push(s.weapon === "none" ? "armor" : "weapon-level", "armor", "loco:wheels6");
+    const review = `${m.cps ? `${m.cps} checkpoint${m.cps > 1 ? "s" : ""} that minute, nice.` : "No checkpoints that minute."} You picked up ${m.scrap} scrap and ${m.taken > m.dealt ? `took more damage (${Math.round(m.taken)}) than you dealt (${Math.round(m.dealt)})` : `dealt ${Math.round(m.dealt)} damage for ${Math.round(m.taken)} taken`}.${m.auto > 20 ? ` You were on autopilot for ${Math.round(m.auto)} s.` : ""}`;
+    const tip = m.cps === 0 ? "Follow the gold beams and park on checkpoints." : m.taken > m.dealt ? "Avoid head-on fights; hit them from the side." : "Keep grabbing scrap between checkpoints.";
+    return { review, upgrades: ups, tip };
+  }
+  async function crewDecide() {
+    const P = S.pit; if (!P || P.stage !== "ask") return;
+    P.stage = "deciding"; P.decideAt = performance.now();
+    const me = P.bot, req = $("crewAsk").value.trim(); lastCrewReq = req;
+    $("pitAskWrap").hidden = true;
+    $("pitReview").hidden = false; $("pitWho").textContent = sampleFn ? "Crew chief (Claude)" : "Crew chief (scripted)"; $("pitReviewTxt").textContent = "Looking over your last minute…";
+    let out = null, who = "scripted";
+    if (sampleFn) {
+      crewCtl = new AbortController();
+      try { out = await sampleFn.json(crewPrompt(me, req), { modelTier: "quick", cache: false, signal: crewCtl.signal }); who = "claude"; }
+      catch (e) { if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e && e.code)) sampleFn = null; out = null; }
+      crewCtl = null;
+    }
+    if (!S.pit || S.pit !== P) return;
+    if (!out || typeof out !== "object") { out = scriptedCrew(me, req); who = "scripted"; }
+    const applied = [], skipped = [];
+    const list = (Array.isArray(out.upgrades) ? out.upgrades : []).map(String).slice(0, 8);
+    for (const id of list) {
+      if (!me.alive || ruleOn("freeze") || me.scrap < cost(me)) break;
+      if (!UPGRADE_IDS.includes(id)) { skipped.push(id); continue; }
+      const up = upgradeFromOrder(me, id, `Pit crew: ${id.replace(":", " → ")}.`);
+      if (!up) { skipped.push(id); continue; }
+      me.pendingUpgrade = up; finishBuild(me);
+      applied.push({ id, img: me.history[me.history.length - 1].img, gen: me.gen });
+    }
+    $("pitWho").textContent = who === "claude" ? "Crew chief (Claude)" : "Crew chief (scripted)";
+    $("pitReviewTxt").textContent = String(out.review || "").slice(0, 400) || "Nothing to add.";
+    $("pitUps").innerHTML = applied.length ? applied.map((a) => `<figure><img src="${a.img}" alt=""><span>v${a.gen} · ${esc(a.id.replace(":", " → "))}</span></figure>`).join("")
+      : `<p class="note">${!me.alive ? "You're wrecked, so there's nothing to upgrade until you respawn." : ruleOn("freeze") ? "Build freeze is on, so the crew can't upgrade." : `No upgrades: ${me.scrap} scrap, next costs ${cost(me)}.`}${skipped.length ? ` Skipped: ${esc(skipped.join(", "))}.` : ""}</p>`;
+    S.crewTip = String(out.tip || "").slice(0, 90);
+    $("pitTip").innerHTML = S.crewTip ? `<span>NEXT MINUTE</span>${esc(S.crewTip)}` : ""; $("pitTip").hidden = !S.crewTip;
+    me.crewLast = { who, review: $("pitReviewTxt").textContent, applied: applied.map((a) => a.id), tip: S.crewTip, minute: P.minute };
+    feed(me, `pit crew (${who === "claude" ? "Claude" : "scripted"}): ${esc($("pitReviewTxt").textContent)}${applied.length ? ` Built: ${esc(applied.map((a) => a.id).join(", "))}.` : ""}`, "agent");
+    P.stage = "done"; P.resumeAt = performance.now() + 10000;
+    $("pitGo").hidden = false; $("pitGo").focus({ preventScroll: true });
+  }
+  function endPit() {
+    const P = S.pit; if (!P) return;
+    if (crewCtl) crewCtl.abort();
+    if (P.bot) P.bot.ms = freshMs();
+    S.pit = null; $("pit").hidden = true; input.lastAt = performance.now();
+  }
+  (async () => { try { sampleFn = window.claude && window.claude.use ? await window.claude.use("sample") : null; } catch (e) { sampleFn = null; } })();
+
   /* ================= LOOP ================= */
   let last = performance.now(), uiT = 0, hudT = 0, vt = 0;
   function frame(now) {
     const rdt = Math.min(0.05, (now - last) / 1000); last = now;
     const simDt = rdt * speed;
     const sub = Math.ceil(simDt / 0.034);
-    if (S.waiting) { if (now - S.waiting.since > 90000) endWait(true); }
+    if (S.pit) { /* pit stop: the world waits */ }
+    else if (S.waiting) { if (now - S.waiting.since > 90000) endWait(true); }
     else for (let i = 0; i < sub; i++) step(simDt / sub);
     vt += rdt;
     sponsorCd = Math.max(0, sponsorCd - rdt);
