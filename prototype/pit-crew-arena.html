@@ -1,0 +1,2004 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pit Crew Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* One sunny toy-box look on purpose (matches Scrap Royale). */
+  :root {
+    color-scheme: light;
+    --bg: #fff3e6;
+    --panel: #ffffff;
+    --panel-2: #fde6d2;
+    --line: rgba(60, 30, 15, 0.10);
+    --line-strong: rgba(60, 30, 15, 0.22);
+    --ink: #2b1d16;
+    --ink-soft: #8a6a58;
+    --signal: #ff5a36;
+    --signal-ink: #ffffff;
+    --gold: #ffb703;
+    --good: #22a867;
+    --bad: #e2402c;
+    --you: #2f80ff;
+    --display: "Lilita One", "Arial Rounded MT Bold", "Arial Black", sans-serif;
+    --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 14px 36px; display: flex; flex-direction: column; gap: 14px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 20px; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: clamp(30px, 5.5vw, 46px); line-height: 1; margin: 0; letter-spacing: 0.01em; }
+  h1 span { color: var(--signal); }
+  .sub { margin: 0; color: var(--ink-soft); max-width: 64ch; font-weight: 700; }
+  h2 { font-family: var(--mono); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-soft); margin: 0; }
+  h3 { font-family: var(--display); font-weight: 400; font-size: 20px; margin: 0; line-height: 1.1; }
+  button { font: inherit; color: inherit; }
+  .btn {
+    font: 700 13px var(--mono); letter-spacing: 0.06em; color: var(--ink); background: #fff; border: 0; border-radius: 999px;
+    padding: 10px 16px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,0.14); white-space: nowrap;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.14); }
+  .btn:focus-visible, .opt:focus-visible, .preset:focus-visible, .lchip:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .btn.primary { background: var(--signal); color: var(--signal-ink); }
+  .btn.dark { background: var(--ink); color: #fff; }
+  .btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+  /* ---------- stage ---------- */
+  .stage { position: relative; height: clamp(480px, 76vh, 800px); border-radius: 18px; overflow: hidden; background: #f3a462; box-shadow: 0 10px 0 rgba(120, 60, 20, 0.12); user-select: none; -webkit-user-select: none; }
+  .stage > canvas { display: block; width: 100%; height: 100%; }
+  .nogl { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; font-weight: 800; color: #fff; }
+  .hud { position: absolute; inset: 0; pointer-events: none; }
+  .hud-tl { position: absolute; left: 14px; top: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font: 700 12px var(--mono); letter-spacing: 0.08em; background: #fff; color: var(--ink); padding: 5px 10px; border-radius: 999px; box-shadow: 0 3px 0 rgba(0,0,0,0.12); }
+  .timer { font-family: var(--display); font-size: clamp(34px, 5vw, 50px); line-height: 1; color: #fff; text-shadow: 0 3px 0 rgba(120, 50, 10, 0.35); font-variant-numeric: tabular-nums; }
+  .timer.low { color: #fff2c2; animation: pulse 0.5s infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.08); } }
+  .chips { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; gap: 5px; width: min(220px, 44vw); }
+  .chip { display: grid; grid-template-columns: 10px 1fr auto; grid-template-rows: auto 6px; column-gap: 7px; row-gap: 3px; align-items: center; background: #fff; border-radius: 12px; padding: 5px 9px; box-shadow: 0 3px 0 rgba(0,0,0,0.12); font: 700 11px var(--mono); letter-spacing: 0.04em; }
+  .chip i { width: 10px; height: 10px; border-radius: 50%; grid-row: 1 / span 2; }
+  .chip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip em { font-style: normal; font-family: var(--display); font-size: 15px; letter-spacing: 0; }
+  .chip .bar { grid-column: 2 / span 2; }
+  .chip.dead { opacity: 0.55; }
+  .chip.mine { outline: 2px solid var(--you); }
+  .bar { height: 6px; background: rgba(43,29,22,0.12); border-radius: 99px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--good); border-radius: 99px; transition: width .15s; }
+  .bar.en > span { background: #36b6ff; }
+  .feed { position: absolute; right: 12px; top: 176px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: min(60%, 320px); }
+  .kf { font: 700 11px var(--mono); background: rgba(43,29,22,0.82); color: #fff; padding: 4px 9px; border-radius: 999px; animation: pop .3s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0; } }
+  .me { position: absolute; left: 12px; bottom: 12px; background: #fff; border-radius: 14px; padding: 8px 10px; box-shadow: 0 3px 0 rgba(0,0,0,0.12); width: min(300px, 62vw); display: flex; flex-direction: column; gap: 5px; }
+  .me .row { display: grid; grid-template-columns: 30px 1fr; gap: 6px; align-items: center; font: 700 10px var(--mono); letter-spacing: 0.08em; color: var(--ink-soft); }
+  .me .bar { height: 9px; }
+  .parts { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pstat { font: 700 10px var(--mono); letter-spacing: 0.04em; padding: 3px 7px; border-radius: 99px; background: var(--panel-2); color: var(--ink); position: relative; overflow: hidden; }
+  .pstat.ready { background: #d9f5e6; }
+  .pstat.cool { color: var(--ink-soft); }
+  .pstat.key { background: var(--ink); color: #fff; }
+  .callout { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font: 700 12px var(--mono); background: rgba(43,29,22,0.88); color: #fff; padding: 6px 12px; border-radius: 999px; max-width: min(90%, 440px); text-align: center; animation: pop .3s cubic-bezier(.3,1.6,.5,1); }
+  .callout b { color: var(--gold); margin-right: 6px; }
+  .keys { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); font: 700 11px var(--mono); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.35); white-space: nowrap; }
+  .center { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; color: #fff; }
+  .center .huge { font-family: var(--display); font-size: clamp(56px, 12vw, 130px); line-height: 0.9; text-shadow: 0 6px 0 rgba(120, 50, 10, 0.35); animation: bump .5s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes bump { from { transform: scale(0.4); } }
+  .center .line { display: inline-block; margin-top: 8px; font: 700 13px var(--mono); letter-spacing: 0.1em; background: rgba(43,29,22,0.8); padding: 4px 10px; border-radius: 999px; }
+
+  /* overlays */
+  .ov { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding: 14px; overflow: auto; background: rgba(43, 29, 22, 0.28); }
+  .ov.clear { background: transparent; pointer-events: none; }
+  .card { background: var(--panel); border-radius: 18px; box-shadow: 0 8px 0 rgba(120, 60, 20, 0.16); padding: 16px; width: 100%; max-width: 980px; margin: auto; display: flex; flex-direction: column; gap: 12px; }
+  .card.narrow { max-width: 620px; }
+  .card p { margin: 0; }
+  .muted { color: var(--ink-soft); }
+  .row-between { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+  .count { font-family: var(--display); font-size: 34px; line-height: 1; min-width: 2ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .count.low { color: var(--bad); }
+  .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+  .presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .preset { text-align: left; background: var(--panel-2); border: 3px solid transparent; border-radius: 14px; padding: 10px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+  .preset img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: #fbd9bd; }
+  .preset[aria-pressed="true"] { border-color: var(--you); background: #e6efff; }
+  .preset small { font: 700 11px var(--mono); color: var(--ink-soft); letter-spacing: 0.03em; }
+  .kv { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 700 11px var(--mono); color: var(--ink-soft); }
+  .kv b { color: var(--ink); }
+
+  /* score table */
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { font: 700 10px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line-strong); }
+  td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  td .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: 0; }
+  tr.you td { background: #eef4ff; }
+  .tbl { overflow-x: auto; }
+
+  /* pit stop */
+  .pit { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; }
+  .pv { position: relative; border-radius: 14px; overflow: hidden; background: #fde6d2; aspect-ratio: 4 / 3; }
+  .pv canvas { display: block; width: 100%; height: 100%; }
+  .pv-tag { position: absolute; left: 10px; top: 10px; font: 700 11px var(--mono); letter-spacing: 0.06em; background: #fff; padding: 4px 9px; border-radius: 999px; box-shadow: 0 2px 0 rgba(0,0,0,0.1); }
+  .pv-legend { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; font: 700 10px var(--mono); }
+  .pv-legend span { background: #fff; padding: 3px 8px; border-radius: 99px; }
+  .pv-legend .add { color: #b07a00; }
+  .pv-legend .rem { color: var(--bad); }
+  .statline { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 700 11px var(--mono); color: var(--ink-soft); }
+  .statline b { color: var(--ink); }
+  .statline .up { color: var(--good); }
+  .statline .down { color: var(--bad); }
+  .lchips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .lchip { font: 700 11px var(--mono); border: 0; border-radius: 99px; padding: 5px 9px; background: var(--panel-2); cursor: pointer; }
+  .lchip[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .obs { background: var(--panel-2); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .obs .who { font: 700 10px var(--mono); letter-spacing: 0.12em; color: var(--ink-soft); text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+  .obs .who i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+  .obs .who i.busy { background: var(--gold); animation: blink 0.8s infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .obs p { font-weight: 800; }
+  .opts { display: grid; gap: 8px; }
+  .opt { text-align: left; background: #fff; border: 3px solid var(--line-strong); border-radius: 14px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+  .opt:hover { border-color: var(--ink-soft); }
+  .opt[aria-pressed="true"] { border-color: var(--you); background: #eef4ff; }
+  .opt-h { display: flex; align-items: center; gap: 8px; }
+  .opt-h .tag { font: 700 11px var(--mono); background: var(--ink); color: #fff; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .opt-h b { font-family: var(--display); font-weight: 400; font-size: 19px; line-height: 1.1; flex: 1; }
+  .opt-h .price { font: 700 12px var(--mono); background: var(--panel-2); padding: 3px 8px; border-radius: 99px; flex: none; }
+  .opt p { margin: 0; font-weight: 700; font-size: 14px; }
+  .bc { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 700 12px var(--mono); }
+  .bc .plus { color: var(--good); }
+  .bc .minus { color: var(--bad); }
+  .opt .val { font: 700 10px var(--mono); color: var(--ink-soft); letter-spacing: 0.06em; }
+  .skeleton { height: 92px; border-radius: 14px; background: linear-gradient(90deg, var(--panel-2), #fff5ec, var(--panel-2)); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .ask { display: flex; gap: 6px; }
+  .ask input { flex: 1; min-width: 0; font: 700 14px var(--body); border: 2px solid var(--line-strong); border-radius: 999px; padding: 8px 14px; background: #fff; color: var(--ink); }
+  .ask input:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
+  .pit-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .trust { display: inline-flex; gap: 6px; align-items: center; font: 700 12px var(--mono); cursor: pointer; margin-right: auto; }
+  .trust input { width: 18px; height: 18px; accent-color: var(--you); }
+  .note { font: 700 11px var(--mono); color: var(--ink-soft); }
+  .note.warn { color: #b3541e; }
+  details.tele summary { font: 700 11px var(--mono); letter-spacing: 0.08em; cursor: pointer; color: var(--ink-soft); }
+  .tgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 4px 12px; margin-top: 6px; font: 700 11px var(--mono); }
+  .tgrid span { color: var(--ink-soft); }
+
+  /* reveal */
+  .reveal-cards { position: absolute; left: 10px; right: 10px; bottom: 10px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; pointer-events: none; }
+  .rcard { background: #fff; border-radius: 14px; padding: 8px 10px; box-shadow: 0 4px 0 rgba(0,0,0,0.12); display: flex; flex-direction: column; gap: 3px; animation: pop .45s cubic-bezier(.3,1.6,.5,1) both; }
+  .rcard .nm { display: flex; align-items: center; gap: 6px; font: 700 12px var(--mono); letter-spacing: 0.06em; }
+  .rcard .nm i { width: 10px; height: 10px; border-radius: 50%; }
+  .rcard .chg { font-family: var(--display); font-size: 17px; line-height: 1.1; }
+  .rcard .why { font-size: 12px; font-weight: 700; color: var(--ink-soft); line-height: 1.3; }
+  .reveal-title { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); font-family: var(--display); font-size: clamp(26px, 4vw, 40px); color: #fff; text-shadow: 0 3px 0 rgba(120,50,10,0.35); white-space: nowrap; }
+
+  /* touch */
+  .touch { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; padding: 12px; pointer-events: none; }
+  .touch .grp { display: flex; gap: 10px; pointer-events: auto; }
+  .tb { width: 64px; height: 64px; border-radius: 50%; border: 0; background: rgba(255,255,255,0.88); font: 700 12px var(--mono); box-shadow: 0 3px 0 rgba(0,0,0,0.15); touch-action: none; }
+  .tb.on { background: var(--ink); color: #fff; }
+  .tb.act { background: var(--signal); color: #fff; }
+  .stage.touching .me { bottom: 92px; }
+  .stage.touching .callout { bottom: 92px; }
+  .stage.touching .keys { display: none; }
+
+  /* below stage */
+  .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+  .panel { background: var(--panel); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 0 rgba(120, 60, 20, 0.08); min-width: 0; }
+  .panel p { margin: 0; }
+  .panel.wide { grid-column: 1 / -1; }
+  .catalog td, .catalog th { font-size: 12px; white-space: nowrap; }
+  .catalog td:last-child, .catalog th:last-child { text-align: left; white-space: normal; min-width: 220px; }
+
+  @media (max-width: 760px) {
+    .pit { grid-template-columns: 1fr; }
+    .reveal-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .feed { display: none; }
+    .keys { display: none; }
+    .chips { width: 150px; }
+    .chip { font-size: 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Pit Crew <span>Arena</span></h1>
+    <p class="sub">You drive. Claude runs your pit crew. Four cars, five rounds, one upgrade per pit stop, and every crew reveals its change at the same time.</p>
+  </header>
+
+  <section class="stage" id="stage" aria-label="Arena">
+    <div class="hud" id="hud" hidden>
+      <div class="hud-tl"><span class="pill" id="roundPill">ROUND 1 / 5</span><div class="timer" id="timer">60</div></div>
+      <div class="keys" id="keysHint">WASD / ARROWS drive · SPACE action</div>
+      <div class="chips" id="chips"></div>
+      <div class="feed" id="feed"></div>
+      <div class="me" id="meBox">
+        <div class="row"><span>HP</span><div class="bar"><span id="meHp"></span></div></div>
+        <div class="row"><span>NRG</span><div class="bar en"><span id="meEn"></span></div></div>
+        <div class="parts" id="meParts"></div>
+      </div>
+      <div class="callout" id="callout" hidden></div>
+    </div>
+    <div class="center" id="center"></div>
+
+    <div class="ov" id="ovIntro">
+      <div class="card narrow">
+        <h2>Pit Crew Arena · prototype</h2>
+        <h3>Drive the car. Let the crew build it.</h3>
+        <ol class="steps">
+          <li><b>Opening garage (20 s):</b> choose Speed, Armor or Close-range.</li>
+          <li><b>Battle (60 s):</b> you steer with WASD or the arrow keys. Weapons fire on their own triggers, and SPACE fires any part wired to “driver”.</li>
+          <li><b>Pit stop (15 s):</b> your crew chief reads the telemetry and proposes two legal upgrades with different trade-offs. Pick one, give an instruction, or keep your build.</li>
+          <li><b>Reveal:</b> all four crews show their changes at once. Then the next round starts.</li>
+        </ol>
+        <p class="muted">Scoring: 3 per wreck, 1 per 25 damage dealt, and 2 for surviving, but only if you dealt at least 20 damage. Cars are repaired every round. Each pit stop pays 5 credits plus up to 3 salvage.</p>
+        <p class="note" id="crewMode">Crew chief: checking for Claude…</p>
+        <div class="row-between"><span class="note" id="profileLine"></span><button class="btn primary" id="startBtn">START MATCH</button></div>
+      </div>
+    </div>
+
+    <div class="ov" id="ovGarage" hidden>
+      <div class="card">
+        <div class="row-between"><div><h2>Opening garage</h2><h3>Pick your starting car</h3></div><div class="count" id="garageCount">20</div></div>
+        <div class="presets" id="presets"></div>
+        <div class="row-between"><span class="note">Rivals are choosing too. You'll see their picks at the reveal.</span><button class="btn primary" id="garageGo">READY</button></div>
+      </div>
+    </div>
+
+    <div class="ov" id="ovScore" hidden>
+      <div class="card narrow">
+        <div class="row-between"><div><h2 id="scoreH">Round 1 results</h2><h3 id="scoreTitle">Round over</h3></div><div class="count" id="scoreCount">5</div></div>
+        <div class="tbl"><table id="scoreTbl"></table></div>
+        <p class="note" id="scoreNote">Your crew is already reading the telemetry…</p>
+      </div>
+    </div>
+
+    <div class="ov" id="ovPit" hidden>
+      <div class="card">
+        <div class="row-between">
+          <div><h2 id="pitH">Pit stop · after round 1</h2><h3>One modification. Choose fast.</h3></div>
+          <div class="row-between" style="gap:10px"><span class="pill" id="pitCredits">0 CREDITS</span><div class="count" id="pitCount">15</div></div>
+        </div>
+        <div class="pit">
+          <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+            <div class="pv" id="pvHost">
+              <span class="pv-tag" id="pvTag">Current build</span>
+              <div class="pv-legend"><span class="add">■ added</span><span class="rem">■ removed</span></div>
+            </div>
+            <div class="statline" id="pitStats"></div>
+            <div>
+              <h2 style="margin-bottom:6px">Lock a favourite part <span class="muted" style="text-transform:none;letter-spacing:0">(can be upgraded, never removed or rewired)</span></h2>
+              <div class="lchips" id="lockChips"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+            <div class="obs"><div class="who"><i id="crewDot"></i><span id="crewWho">Crew chief</span></div><p id="crewObs">Reading the telemetry…</p></div>
+            <div class="opts" id="opts"></div>
+            <form class="ask" id="askForm" autocomplete="off">
+              <input id="askIn" maxlength="120" placeholder="Tell the crew, e.g. “more range” or “make me tanky”" aria-label="Instruction for your crew">
+              <button class="btn dark" id="askBtn" type="submit">ASK</button>
+            </form>
+            <div class="pit-actions">
+              <label class="trust"><input type="checkbox" id="trust"> Trust my crew</label>
+              <button class="btn" id="keepBtn" type="button">KEEP BUILD</button>
+              <button class="btn primary" id="goBtn" type="button">LOCK IT IN</button>
+            </div>
+            <p class="note" id="pitNote"></p>
+            <details class="tele"><summary>Telemetry the crew saw</summary><div class="tgrid" id="teleBox"></div></details>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ov clear" id="ovReveal" hidden>
+      <div class="reveal-title" id="revealTitle">REVEAL</div>
+      <div class="reveal-cards" id="revealCards"></div>
+    </div>
+
+    <div class="ov" id="ovFinal" hidden>
+      <div class="card narrow">
+        <h2>Match over</h2>
+        <h3 id="finalTitle">Winner</h3>
+        <div class="tbl"><table id="finalTbl"></table></div>
+        <p id="finalNote" class="muted"></p>
+        <div class="row-between"><span class="note" id="finalProfile"></span><button class="btn primary" id="againBtn">PLAY AGAIN</button></div>
+      </div>
+    </div>
+
+    <div class="touch" id="touch" hidden>
+      <div class="grp"><button class="tb" data-k="left" aria-label="Steer left">◀</button><button class="tb" data-k="right" aria-label="Steer right">▶</button></div>
+      <div class="grp"><button class="tb" data-k="down" aria-label="Brake or reverse">BRK</button><button class="tb act" data-k="act" aria-label="Action">ACT</button><button class="tb" data-k="up" aria-label="Accelerate">GAS</button></div>
+    </div>
+  </section>
+
+  <section class="panels">
+    <div class="panel">
+      <h2>How the crew works</h2>
+      <p>At round end your crew gets the blueprint, your credits, the telemetry (collisions, time at each range, damage by side and source, launcher accuracy, empty-battery moments), what the rivals visibly run, your instruction, and the upgrade history. It sends back <b>one observation and two modifications</b>.</p>
+      <p>Every proposal goes through the validator: mounts, triggers, power slots, weight, credits and your locked part. If the validator rejects one, the crew gets the exact error and one retry. After that, or if the crew misses the deadline, a scripted backup crew fills in. The previous legal build always stands if nothing is chosen.</p>
+      <p class="note">The crew picks parts, mounts and triggers. It can't set damage values, change rules or touch other cars.</p>
+    </div>
+    <div class="panel">
+      <h2>Driver profile</h2>
+      <div id="profileBox" class="kv"></div>
+      <p class="note">Saved in this browser only. Your crew sees it, so it learns what you tend to pick.</p>
+    </div>
+    <div class="panel">
+      <h2>Balance check</h2>
+      <p>Runs seeded AI-only fights with the same simulation the match uses, then shows each starting car's points and each weapon's share of damage. The same seed always plays out the same fight.</p>
+      <div class="row-between"><button class="btn" id="balBtn">RUN 60 TEST FIGHTS</button><span class="note" id="balNote"></span></div>
+      <div class="tbl" id="balOut"></div>
+    </div>
+    <div class="panel wide">
+      <h2>Parts catalog (the server owns these numbers)</h2>
+      <div class="tbl catalog" id="catalog"></div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const stage = $("stage");
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const wrapA = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const pct = (v) => Math.round(clamp(v, 0, 1) * 100) + "%";
+  const r0 = (v) => Math.round(v);
+  const hexStr = (n) => "#" + n.toString(16).padStart(6, "0");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+  /* =====================================================================
+     CATALOG — every number lives here (the "server" owns it)
+     ===================================================================== */
+  const ROUNDS = 5, ROUND_TIME = 60, GARAGE_TIME = 20, PIT_TIME = 15, CREW_WAIT = 9;
+  const ALLOWANCE = 5, SALVAGE_CAP = 3;
+  const MOUNTS = ["front", "left", "right", "rear", "top"];
+  const SIDES = ["front", "left", "right", "rear", "top"];
+  const CHASSIS = {
+    light:    { name: "Light frame",    hp: 85,  mass: 4,   carry: 9,  cost: 1, size: [2.0, 0.55, 1.3] },
+    standard: { name: "Standard frame", hp: 115, mass: 6,   carry: 11, cost: 2, size: [2.2, 0.65, 1.4] },
+    heavy:    { name: "Heavy frame",    hp: 150, mass: 8.5, carry: 13, cost: 4, size: [2.4, 0.78, 1.55] },
+  };
+  const WHEELS = {
+    slick:   { name: "Slick wheels",    speed: 1.15, grip: 0.75, turn: 1.12, push: 0.9,  mass: 0.5, cost: 2 },
+    offroad: { name: "Off-road wheels", speed: 1.0,  grip: 1.0,  turn: 1.0,  push: 1.0,  mass: 1,   cost: 2 },
+    treads:  { name: "Treads",          speed: 0.84, grip: 1.4,  turn: 0.92, push: 1.4,  mass: 2,   cost: 2 },
+  };
+  const MOTOR = [null, { power: 1 }, { power: 1.25 }, { power: 1.5 }];
+  const BATTERY = [null, { cap: 24, regen: 4, slots: 4 }, { cap: 34, regen: 5.5, slots: 6 }, { cap: 44, regen: 7, slots: 8 }];
+  const CORE_UPGRADE = 3, ARMOR_COST = 2, ARMOR_CUT = 0.2, SHIELD_CUT = 0.65;
+  const PARTS = {
+    ram:      { name: "Ram wedge",       short: "RAM",    mounts: ["front"], cost: 3, mass: 1.5, power: 0, energy: 0, triggers: ["contact"], dmg: [0, 1, 1.45],
+                desc: "Head-on hits do 6 + 1.6× impact speed. Nose-first only." },
+    saw:      { name: "Circular saw",    short: "SAW",    mounts: ["front", "left", "right"], cost: 4, mass: 1.5, power: 2, energy: 3, triggers: ["contact"], dps: [0, 14, 21],
+                desc: "Cuts anything touching that side. Uses 3 energy per second while cutting." },
+    launcher: { name: "Rocket launcher", short: "ROCKET", mounts: ["front", "top"], cost: 5, mass: 2, power: 2, energy: 4, cd: 2, triggers: ["in_range", "manual", "ready"], dmg: [0, 8, 11], ammo: [0, 8, 12], range: 16, speed: 28,
+                desc: "8 damage per hit from up to 16 m. Front mounts fire straight ahead; top mounts aim themselves. Limited ammo." },
+    emitter:  { name: "Zap emitter",     short: "ZAP",    mounts: ["top"], cost: 6, mass: 2.5, power: 3, energy: 12, cd: 5, triggers: ["enemy_near", "two_near", "manual"], pool: [0, 8, 12], radius: 4.5,
+                desc: "An area pulse within 4.5 m. Its damage pool is split between everyone it hits, and it strikes their top armor." },
+    shield:   { name: "Shield",          short: "SHIELD", mounts: ["top", "rear"], cost: 4, mass: 1.5, power: 2, energy: 8, cd: 9, triggers: ["hit_hard", "low_hp", "manual"], dur: [0, 2, 2.8],
+                desc: "A bubble that blocks 65% of damage for 2 seconds." },
+    boost:    { name: "Booster",         short: "BOOST",  mounts: ["rear"], cost: 3, mass: 1, power: 1, energy: 6, cd: 5, triggers: ["manual", "chasing", "low_hp"], dur: [0, 1, 1.4],
+                desc: "Doubles thrust and raises top speed by 55% for 1 second." },
+    hook:     { name: "Grab hook",       short: "HOOK",   mounts: ["front", "top"], cost: 4, mass: 1.5, power: 1, energy: 5, cd: 5, triggers: ["in_range", "manual"], range: [0, 9, 12], dmg: 5,
+                desc: "Yanks a rival toward you from up to 9 m and stuns it for a moment." },
+  };
+  const TRIG = {
+    contact:    { short: "on contact",   text: "while touching an enemy" },
+    in_range:   { short: "in range",     text: "when an enemy is in range (front mounts: ahead)" },
+    ready:      { short: "when ready",   text: "whenever it's off cooldown and anyone is alive" },
+    enemy_near: { short: "enemy near",   text: "when any enemy is within 4.5 m" },
+    two_near:   { short: "2 near",       text: "when two or more enemies are within 4.5 m" },
+    hit_hard:   { short: "hit hard",     text: "after taking 12+ damage in one second" },
+    low_hp:     { short: "low HP",       text: "when health is under 35%" },
+    chasing:    { short: "chasing",      text: "when a target is ahead and more than 6 m away" },
+    manual:     { short: "driver",       text: "when the driver presses SPACE" },
+  };
+  const PRESETS = {
+    speed: { name: "Speed", blurb: "Light and quick, with a nose ram and a booster on SPACE.",
+      bp: { chassis: "light", wheels: "slick", motor: 2, battery: 1, armor: { front: 0, left: 0, right: 0, rear: 0, top: 0 },
+            mounts: { front: { part: "ram", lvl: 1, trigger: "contact" }, left: null, right: null, rear: { part: "boost", lvl: 1, trigger: "manual" }, top: null } } },
+    armor: { name: "Armor", blurb: "A heavy tank on treads with a plated nose and sides, plus a ram.",
+      bp: { chassis: "heavy", wheels: "treads", motor: 1, battery: 1, armor: { front: 2, left: 1, right: 1, rear: 0, top: 0 },
+            mounts: { front: { part: "ram", lvl: 1, trigger: "contact" }, left: null, right: null, rear: null, top: null } } },
+    close: { name: "Close-range", blurb: "A front saw plus a roof hook that drags rivals into it.",
+      bp: { chassis: "standard", wheels: "offroad", motor: 1, battery: 2, armor: { front: 0, left: 0, right: 0, rear: 0, top: 0 },
+            mounts: { front: { part: "saw", lvl: 1, trigger: "contact" }, left: null, right: null, rear: null, top: { part: "hook", lvl: 1, trigger: "in_range" } } } },
+  };
+  const upCost = (P) => Math.ceil(P.cost * 0.75);
+  const partValue = (p) => { const P = PARTS[p.part]; return P.cost + (p.lvl - 1) * upCost(P); };
+
+  function derive(bp) {
+    const c = CHASSIS[bp.chassis], w = WHEELS[bp.wheels], m = MOTOR[bp.motor], b = BATTERY[bp.battery];
+    let load = w.mass + (bp.motor - 1) * 0.5 + (bp.battery - 1) * 0.5, power = 0;
+    for (const s of SIDES) load += (bp.armor[s] || 0);
+    for (const k of MOUNTS) { const p = bp.mounts[k]; if (!p || !PARTS[p.part]) continue; load += PARTS[p.part].mass + (p.lvl - 1) * 0.5; power += PARTS[p.part].power; }
+    const mass = c.mass + load;
+    const top = (9 + 2.4 * m.power) * w.speed * clamp(1.14 - mass * 0.018, 0.72, 1.05);
+    const accel = 15 * m.power / Math.sqrt(mass / 8);
+    return { hp: c.hp, mass, load, carry: c.carry, power, slots: b.slots, top, accel, turn: w.turn * clamp(1.22 - mass * 0.017, 0.82, 1.14),
+      grip: w.grip, push: w.push, cap: b.cap, regen: b.regen, r: c.size[0] * 0.5, half: c.size[2] * 0.5 };
+  }
+
+  /* =====================================================================
+     VALIDATOR — precise failures, never silent fixes
+     ===================================================================== */
+  function validateBlueprint(bp) {
+    const e = [];
+    if (!CHASSIS[bp.chassis]) e.push(`Unknown chassis "${bp.chassis}" (light, standard, heavy).`);
+    if (!WHEELS[bp.wheels]) e.push(`Unknown wheels "${bp.wheels}" (slick, offroad, treads).`);
+    if (!(bp.motor >= 1 && bp.motor <= 3)) e.push("Motor must be Mk 1–3.");
+    if (!(bp.battery >= 1 && bp.battery <= 3)) e.push("Battery must be Mk 1–3.");
+    for (const s of SIDES) if (!(bp.armor[s] >= 0 && bp.armor[s] <= 2)) e.push(`${cap(s)} armor must be 0–2.`);
+    for (const k of MOUNTS) {
+      const p = bp.mounts[k]; if (!p) continue;
+      const P = PARTS[p.part];
+      if (!P) { e.push(`Unknown part "${p.part}" on the ${k} mount.`); continue; }
+      if (!P.mounts.includes(k)) e.push(`${P.name} can't go on the ${k} mount (allowed: ${P.mounts.join(", ")}).`);
+      if (!(p.lvl >= 1 && p.lvl <= 2)) e.push(`${P.name} must be Mk 1 or Mk 2.`);
+      if (!P.triggers.includes(p.trigger)) e.push(`${P.name} doesn't support the "${p.trigger}" trigger (supported: ${P.triggers.join(", ")}).`);
+    }
+    if (!e.length) {
+      const d = derive(bp);
+      if (d.power > d.slots) e.push(`Power ${d.power}/${d.slots}: the battery Mk ${bp.battery} has ${d.slots} power slots. Upgrade the battery or drop a part.`);
+      if (d.load > d.carry + 1e-6) e.push(`Too heavy: parts weigh ${d.load.toFixed(1)}, and the ${CHASSIS[bp.chassis].name.toLowerCase()} carries ${d.carry}.`);
+    }
+    return e;
+  }
+  const keyName = (bp, key) => {
+    if (key.startsWith("mount:")) { const m = key.slice(6), p = bp.mounts[m]; return p ? `${m} ${PARTS[p.part].name.toLowerCase()}` : `${m} mount`; }
+    if (key.startsWith("armor:")) return `${key.slice(6)} armor`;
+    return key === "chassis" ? CHASSIS[bp.chassis].name.toLowerCase() : key === "wheels" ? WHEELS[bp.wheels].name.toLowerCase() : key;
+  };
+  function normalizeOp(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const s = (v) => (typeof v === "string" ? v.trim().toLowerCase().slice(0, 20) : undefined);
+    const o = { op: s(raw.op) };
+    for (const f of ["part", "mount", "trigger", "target", "side", "to"]) if (raw[f] != null) o[f] = s(raw[f]);
+    return o;
+  }
+  /* apply one modification → new blueprint + cost, or exact errors */
+  function applyOp(bp, op, credits, lock) {
+    const e = [], nb = clone(bp); let cost = 0, label = "";
+    const locked = (key, verb) => { if (lock === key) e.push(`Your ${keyName(bp, key)} is locked by your driver, so it can't be ${verb}.`); };
+    if (!op || !op.op) return { ok: false, errors: ["No modification given."], bp, cost: 0 };
+    const mountOf = (m) => { if (!MOUNTS.includes(m)) { e.push(`Unknown mount "${m}" (front, left, right, rear, top).`); return null; } return m; };
+    switch (op.op) {
+      case "add": {
+        const P = PARTS[op.part], m = mountOf(op.mount);
+        if (!P) { e.push(`Unknown part "${op.part}" (${Object.keys(PARTS).join(", ")}).`); break; }
+        if (!m) break;
+        if (nb.mounts[m]) { e.push(`The ${m} mount already holds a ${PARTS[nb.mounts[m].part].name.toLowerCase()}. Use "replace".`); break; }
+        nb.mounts[m] = { part: op.part, lvl: 1, trigger: op.trigger || P.triggers[0] };
+        cost = P.cost; label = `+ ${P.name} (${m}, ${TRIG[nb.mounts[m].trigger] ? TRIG[nb.mounts[m].trigger].short : nb.mounts[m].trigger})`; break;
+      }
+      case "replace": {
+        const P = PARTS[op.part], m = mountOf(op.mount);
+        if (!P) { e.push(`Unknown part "${op.part}".`); break; }
+        if (!m) break;
+        const old = nb.mounts[m];
+        if (!old) { e.push(`The ${m} mount is empty. Use "add".`); break; }
+        if (old.part === op.part) { e.push(`The ${m} mount already has a ${P.name.toLowerCase()}. Use "upgrade" or "rewire".`); break; }
+        locked("mount:" + m, "replaced");
+        nb.mounts[m] = { part: op.part, lvl: 1, trigger: op.trigger || P.triggers[0] };
+        cost = Math.max(0, P.cost - Math.floor(partValue(old) / 2)); label = `${PARTS[old.part].name} → ${P.name} (${m})`; break;
+      }
+      case "remove": {
+        const m = mountOf(op.mount); if (!m) break;
+        const old = nb.mounts[m];
+        if (!old) { e.push(`The ${m} mount is already empty.`); break; }
+        locked("mount:" + m, "removed");
+        nb.mounts[m] = null; cost = -Math.floor(partValue(old) / 2); label = `− ${PARTS[old.part].name} (${m}), refund ${-cost}`; break;
+      }
+      case "upgrade": {
+        const t = op.target;
+        if (t === "motor" || t === "battery") {
+          if (nb[t] >= 3) { e.push(`The ${t} is already Mk 3 (the max).`); break; }
+          nb[t]++; cost = CORE_UPGRADE; label = `${cap(t)} → Mk ${nb[t]}`; break;
+        }
+        const m = mountOf(t); if (!m) break;
+        const p = nb.mounts[m];
+        if (!p) { e.push(`Nothing on the ${m} mount to upgrade.`); break; }
+        if (p.lvl >= 2) { e.push(`${PARTS[p.part].name} on ${m} is already Mk 2 (the max).`); break; }
+        p.lvl = 2; cost = upCost(PARTS[p.part]); label = `${PARTS[p.part].name} → Mk 2 (${m})`; break;
+      }
+      case "armor": {
+        const s = op.side || op.target;
+        if (!SIDES.includes(s)) { e.push(`Unknown armor side "${s}" (front, left, right, rear, top).`); break; }
+        if (nb.armor[s] >= 2) { e.push(`${cap(s)} armor is already level 2 (the max).`); break; }
+        nb.armor[s]++; cost = ARMOR_COST; label = `${cap(s)} armor → ${nb.armor[s]}`; break;
+      }
+      case "swap": {
+        const t = op.target;
+        if (t === "chassis") {
+          if (!CHASSIS[op.to]) { e.push(`Unknown chassis "${op.to}" (light, standard, heavy).`); break; }
+          if (op.to === nb.chassis) { e.push(`You already have a ${CHASSIS[op.to].name.toLowerCase()}.`); break; }
+          locked("chassis", "swapped");
+          cost = 1 + Math.max(0, CHASSIS[op.to].cost - CHASSIS[nb.chassis].cost); nb.chassis = op.to; label = `Chassis → ${CHASSIS[op.to].name}`; break;
+        }
+        if (t === "wheels") {
+          if (!WHEELS[op.to]) { e.push(`Unknown wheels "${op.to}" (slick, offroad, treads).`); break; }
+          if (op.to === nb.wheels) { e.push(`You already run ${WHEELS[op.to].name.toLowerCase()}.`); break; }
+          locked("wheels", "swapped");
+          nb.wheels = op.to; cost = WHEELS[op.to].cost; label = `Wheels → ${WHEELS[op.to].name}`; break;
+        }
+        e.push(`Swap needs target "chassis" or "wheels", not "${t}".`); break;
+      }
+      case "rewire": {
+        const m = mountOf(op.mount); if (!m) break;
+        const p = nb.mounts[m];
+        if (!p) { e.push(`Nothing on the ${m} mount to rewire.`); break; }
+        if (!TRIG[op.trigger]) { e.push(`Unknown trigger "${op.trigger}".`); break; }
+        if (p.trigger === op.trigger) { e.push(`${PARTS[p.part].name} already fires ${TRIG[op.trigger].short}.`); break; }
+        locked("mount:" + m, "rewired");
+        p.trigger = op.trigger; label = `${PARTS[p.part].name}: fire ${TRIG[op.trigger].short}`; break;
+      }
+      default: e.push(`Unknown op "${op.op}". Use add, replace, remove, upgrade, armor, swap or rewire.`);
+    }
+    if (!e.length) {
+      e.push(...validateBlueprint(nb));
+      if (cost > credits) e.push(`It costs ${cost} credits, and you have ${credits}.`);
+    }
+    return { ok: !e.length, bp: e.length ? bp : nb, cost, errors: e, label };
+  }
+  function partKeys(bp) {
+    const o = { chassis: bp.chassis, wheels: bp.wheels, motor: bp.motor, battery: bp.battery };
+    for (const s of SIDES) if (bp.armor[s]) o["armor:" + s] = bp.armor[s];
+    for (const m of MOUNTS) if (bp.mounts[m]) { const p = bp.mounts[m]; o["mount:" + m] = `${p.part}|${p.lvl}|${p.trigger}`; }
+    return o;
+  }
+  function diffKeys(a, b) {
+    const A = partKeys(a), B = partKeys(b), added = [], removed = [], changed = [];
+    for (const k in B) if (!(k in A)) added.push(k); else if (A[k] !== B[k]) changed.push(k);
+    for (const k in A) if (!(k in B)) removed.push(k);
+    for (const k of changed.slice()) if (k.startsWith("mount:") && A[k].split("|")[0] !== B[k].split("|")[0]) removed.push(k);
+    return { added, removed, changed };
+  }
+  function buildSummary(bp) {
+    const parts = MOUNTS.filter((m) => bp.mounts[m]).map((m) => { const p = bp.mounts[m]; return `${m}: ${PARTS[p.part].short.toLowerCase()} Mk${p.lvl} (${TRIG[p.trigger].short})`; });
+    const arm = SIDES.filter((s) => bp.armor[s]).map((s) => `${s} ${bp.armor[s]}`);
+    return `${bp.chassis} frame, ${bp.wheels}, motor Mk${bp.motor}, battery Mk${bp.battery}; ${parts.join("; ") || "no weapons"}${arm.length ? `; armor ${arm.join(", ")}` : ""}`;
+  }
+
+  /* =====================================================================
+     SIMULATION — deterministic, authoritative, no rendering in here
+     ===================================================================== */
+  const A = 21;
+  const PILLARS = [{ x: -9, z: -7, r: 1.3 }, { x: 9, z: -7, r: 1.3 }, { x: -9, z: 7, r: 1.3 }, { x: 9, z: 7, r: 1.3 }];
+  const STARTS = [{ x: -15, z: 13, h: Math.PI / 4 }, { x: 15, z: 13, h: 3 * Math.PI / 4 }, { x: 15, z: -13, h: -3 * Math.PI / 4 }, { x: -15, z: -13, h: -Math.PI / 4 }];
+  const freshTel = () => ({ collisions: 0, time: { close: 0, mid: 0, far: 0 }, crowdT: 0, dealt: 0, taken: 0, takenSide: { front: 0, left: 0, right: 0, rear: 0, top: 0 },
+    takenSrc: {}, dealtSrc: {}, shots: 0, hits: 0, energyUsed: 0, starved: 0, noAmmo: 0, hardHits: 0, shielded: 0, kos: 0, aliveT: 0, dist: 0, fires: {} });
+  function toLocal(c, x, z) { const dx = x - c.x, dz = z - c.z, co = Math.cos(c.h), si = Math.sin(c.h); return { lx: dx * co - dz * si, lz: dx * si + dz * co }; }
+  function toWorld(c, lx, lz) { const co = Math.cos(c.h), si = Math.sin(c.h); return { x: c.x + lx * co + lz * si, z: c.z - lx * si + lz * co }; }
+  function sideOf(c, x, z) { const { lx, lz } = toLocal(c, x, z), a = Math.atan2(lz, lx); if (Math.abs(a) < Math.PI / 4) return "front"; if (Math.abs(a) > 3 * Math.PI / 4) return "rear"; return lz < 0 ? "left" : "right"; }
+  function mountPoint(c, m) {
+    const L = c.d.r, W = c.d.half;
+    const o = m === "front" ? [L + 0.3, 0] : m === "rear" ? [-L - 0.3, 0] : m === "left" ? [0, -W - 0.3] : m === "right" ? [0, W + 0.3] : [0.2, 0];
+    return toWorld(c, o[0], o[1]);
+  }
+
+  function createBattle(entries, seed) {
+    const rng = mulberry32(seed);
+    const cars = entries.map((e, i) => {
+      const d = derive(e.bp), st = STARTS[i];
+      const car = { id: e.id, name: e.name, human: !!e.human, bp: e.bp, d, x: st.x, z: st.z, h: st.h, vx: 0, vz: 0, hp: d.hp, energy: d.cap, alive: true,
+        cd: {}, ammo: {}, shieldT: 0, boostT: 0, stunT: 0, sawOn: {}, recent: [], wasHard: false, lastHitBy: null, lastHitT: -99, koBy: null, koT: null,
+        tel: freshTel(), ctl: { thr: 0, steer: 0 }, starveAt: {}, fxAt: 0,
+        ai: { target: null, retarget: 0, stuck: 0, reverseT: 0, revSteer: 1, bias: rng() < 0.5 ? -1 : 1, flee: 0, skill: 0.75 + rng() * 0.25 } };
+      for (const m of MOUNTS) { const p = e.bp.mounts[m]; if (p && p.part === "launcher") car.ammo[m] = PARTS.launcher.ammo[p.lvl]; }
+      car.role = roleOf(e.bp);
+      return car;
+    });
+    const B = { cars, t: 0, over: false, events: [], shots: [], rng, pairCd: {} };
+    return B;
+  }
+  function roleOf(bp) {
+    const has = (p, ms) => (ms || MOUNTS).some((m) => bp.mounts[m] && bp.mounts[m].part === p);
+    if (has("launcher") && !has("ram", ["front"]) && !has("saw", ["front"])) return "ranged";
+    if ((has("saw", ["left"]) || has("saw", ["right"])) && !has("ram", ["front"]) && !has("saw", ["front"])) return "side";
+    if (has("emitter") && !has("ram") && !has("saw")) return "zapper";
+    return "melee";
+  }
+  const enemiesOf = (B, c) => B.cars.filter((e) => e !== c && e.alive);
+  function nearestEnemy(B, c) { let best = null, bd = 1e9; for (const e of enemiesOf(B, c)) { const d = Math.hypot(e.x - c.x, e.z - c.z); if (d < bd) { bd = d; best = e; } } return best ? { e: best, d: bd } : null; }
+  const countNear = (B, c, r) => enemiesOf(B, c).filter((e) => Math.hypot(e.x - c.x, e.z - c.z) <= r + e.d.r * 0.5).length;
+  const recentDmg = (c) => c.recent.reduce((s, x) => s + x[1], 0);
+
+  function stepBattle(B, dt, input) {
+    if (B.over) return;
+    B.t += dt;
+    const live = B.cars.filter((c) => c.alive);
+    for (const c of live) {
+      if (c.human) { c.ctl.thr = input ? input.thr : 0; c.ctl.steer = input ? input.steer : 0; }
+      else aiDrive(B, c, dt);
+      c.energy = Math.min(c.d.cap, c.energy + c.d.regen * dt);
+      c.shieldT = Math.max(0, c.shieldT - dt); c.boostT = Math.max(0, c.boostT - dt); c.stunT = Math.max(0, c.stunT - dt);
+      for (const k in c.cd) c.cd[k] = Math.max(0, c.cd[k] - dt);
+      while (c.recent.length && B.t - c.recent[0][0] > 1) c.recent.shift();
+      const hard = recentDmg(c) >= 12; if (hard && !c.wasHard) c.tel.hardHits++; c.wasHard = hard;
+      move(B, c, dt);
+      const ne = nearestEnemy(B, c);
+      if (ne) { if (ne.d < 4.5) c.tel.time.close += dt; else if (ne.d < 11) c.tel.time.mid += dt; else c.tel.time.far += dt; }
+      if (countNear(B, c, 6) >= 2) c.tel.crowdT += dt;
+      c.tel.aliveT += dt; c.tel.dist += Math.hypot(c.vx, c.vz) * dt;
+    }
+    collide(B);
+    for (const c of live) if (c.alive) weapons(B, c, dt, c.human && input ? input.action : false);
+    stepShots(B, dt);
+    if (B.t >= ROUND_TIME || B.cars.filter((c) => c.alive).length <= 1) { B.over = true; B.t = Math.min(B.t, ROUND_TIME); }
+  }
+
+  function move(B, c, dt) {
+    const d = c.d;
+    let fx = Math.cos(c.h), fz = -Math.sin(c.h), sx = Math.sin(c.h), sz = Math.cos(c.h);
+    let vf = c.vx * fx + c.vz * fz, vs = c.vx * sx + c.vz * sz;
+    const boost = c.boostT > 0, top = d.top * (boost ? 1.55 : 1), acc = d.accel * (boost ? 2 : 1);
+    const thr = c.stunT > 0 ? 0 : c.ctl.thr;
+    if (boost) vf += acc * 0.5 * dt;
+    if (thr > 0) vf += acc * thr * dt * (vf < 0 ? 2.2 : 1);
+    else if (thr < 0) vf += acc * thr * dt * (vf > 0 ? 2.2 : 0.7);
+    else vf *= Math.exp(-1.5 * dt);
+    if (vf > top) vf -= (vf - top) * Math.min(1, 5 * dt);
+    if (vf < -top * 0.45) vf -= (vf + top * 0.45) * Math.min(1, 5 * dt);
+    vs *= Math.exp(-d.grip * 7 * dt);
+    const steer = c.stunT > 0 ? 0 : c.ctl.steer;
+    const turnScale = clamp(Math.abs(vf) / 3.2, 0.25, 1) * (vf >= -0.3 ? 1 : -1);
+    c.h = wrapA(c.h + steer * d.turn * 2.7 * dt * turnScale);
+    fx = Math.cos(c.h); fz = -Math.sin(c.h); sx = Math.sin(c.h); sz = Math.cos(c.h);
+    c.vx = fx * vf + sx * vs; c.vz = fz * vf + sz * vs;
+    c.x += c.vx * dt; c.z += c.vz * dt;
+    const r = d.r * 0.92;
+    const wall = (n) => { if (n > 4 && (c.wallAt || -9) < B.t) { c.tel.collisions++; c.wallAt = B.t + 0.5; B.events.push({ type: "bump", x: c.x, z: c.z, k: n / 12 }); } };
+    if (c.x > A - r) { c.x = A - r; if (c.vx > 0) { wall(c.vx); c.vx *= -0.35; } }
+    if (c.x < -A + r) { c.x = -A + r; if (c.vx < 0) { wall(-c.vx); c.vx *= -0.35; } }
+    if (c.z > A - r) { c.z = A - r; if (c.vz > 0) { wall(c.vz); c.vz *= -0.35; } }
+    if (c.z < -A + r) { c.z = -A + r; if (c.vz < 0) { wall(-c.vz); c.vz *= -0.35; } }
+    for (const P of PILLARS) {
+      const dx = c.x - P.x, dz = c.z - P.z, dd = Math.hypot(dx, dz), mn = P.r + r;
+      if (dd < mn && dd > 1e-4) {
+        const nx = dx / dd, nz = dz / dd; c.x = P.x + nx * mn; c.z = P.z + nz * mn;
+        const vn = c.vx * nx + c.vz * nz; if (vn < 0) { wall(-vn); c.vx -= 1.35 * vn * nx; c.vz -= 1.35 * vn * nz; }
+      }
+    }
+  }
+
+  function collide(B) {
+    const cs = B.cars;
+    for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
+      const a = cs[i], b = cs[j]; if (!a.alive || !b.alive) continue;
+      const dx = b.x - a.x, dz = b.z - a.z, dd = Math.hypot(dx, dz), mn = (a.d.r + b.d.r) * 0.9;
+      if (dd >= mn || dd < 1e-4) continue;
+      const nx = dx / dd, nz = dz / dd, ma = a.d.mass * a.d.push, mb = b.d.mass * b.d.push, ov = mn - dd;
+      a.x -= nx * ov * mb / (ma + mb); a.z -= nz * ov * mb / (ma + mb); b.x += nx * ov * ma / (ma + mb); b.z += nz * ov * ma / (ma + mb);
+      const aDrive = a.vx * nx + a.vz * nz, bDrive = -(b.vx * nx + b.vz * nz);
+      const rel = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
+      if (rel >= 0) continue;
+      const jj = -(1.35) * rel / (1 / ma + 1 / mb);
+      a.vx -= jj * nx / ma; a.vz -= jj * nz / ma; b.vx += jj * nx / mb; b.vz += jj * nz / mb;
+      const impact = -rel, key = a.id + ":" + b.id;
+      if (impact < 2.5 || (B.pairCd[key] || 0) > B.t) continue;
+      B.pairCd[key] = B.t + 0.5;
+      a.tel.collisions++; b.tel.collisions++;
+      const base = Math.max(0, impact - 4) * 0.8;
+      if (base > 0) {
+        hurt(B, b, base * clamp(aDrive / impact, 0.2, 1), a, "bump", a);
+        hurt(B, a, base * clamp(bDrive / impact, 0.2, 1), b, "bump", b);
+      }
+      ramHit(B, a, b, impact, nx, nz); ramHit(B, b, a, impact, -nx, -nz);
+      B.events.push({ type: "bump", x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, k: impact / 10 });
+    }
+  }
+  function ramHit(B, att, vic, impact, nx, nz) {
+    const p = att.bp.mounts.front; if (!p || p.part !== "ram" || !att.alive || !vic.alive) return;
+    const { lx, lz } = toLocal(att, vic.x, vic.z);
+    if (lx <= 0 || Math.abs(Math.atan2(lz, lx)) > 0.72) return;
+    const dmg = (6 + impact * 1.6) * PARTS.ram.dmg[p.lvl];
+    const push = 3.5 * p.lvl / (vic.d.mass * vic.d.push / 8);
+    vic.vx += nx * push; vic.vz += nz * push;
+    att.tel.fires.front = (att.tel.fires.front || 0) + 1;
+    hurt(B, vic, dmg, att, "ram", att);
+  }
+
+  function hurt(B, v, amt, from, src, att, forceSide) {
+    if (!v.alive || amt <= 0) return;
+    const side = forceSide || sideOf(v, from.x, from.z);
+    let a = amt * (1 - ARMOR_CUT * (v.bp.armor[side] || 0));
+    if (v.shieldT > 0) { v.tel.shielded += a * SHIELD_CUT; a *= 1 - SHIELD_CUT; }
+    a = Math.min(a, v.hp);
+    v.hp -= a; v.recent.push([B.t, a]);
+    v.tel.taken += a; v.tel.takenSide[side] += a; v.tel.takenSrc[src] = (v.tel.takenSrc[src] || 0) + a;
+    if (att && att !== v) { att.tel.dealt += a; att.tel.dealtSrc[src] = (att.tel.dealtSrc[src] || 0) + a; v.lastHitBy = att; v.lastHitT = B.t; }
+    if (src !== "saw" || B.t - v.fxAt > 0.09) { v.fxAt = B.t; B.events.push({ type: "hit", x: v.x, z: v.z, fx: from.x, fz: from.z, amt: a, src, id: v.id, by: att ? att.id : null }); }
+    if (v.hp <= 0.01) {
+      v.hp = 0; v.alive = false; v.koT = B.t;
+      const k = B.t - v.lastHitT < 5 ? v.lastHitBy : null;
+      v.koBy = k ? k.id : null; if (k) k.tel.kos++;
+      B.events.push({ type: "ko", x: v.x, z: v.z, id: v.id, by: v.koBy });
+    }
+  }
+  function starve(B, c, m) { if ((c.starveAt[m] || 0) <= B.t) { c.tel.starved++; c.starveAt[m] = B.t + 1.5; } }
+  function targetFor(B, c, m, p) {
+    const P = PARTS[p.part], R = p.part === "hook" ? P.range[p.lvl] : P.range, arc = p.part === "hook" ? 0.6 : 0.35;
+    let best = null, bd = 1e9;
+    for (const e of enemiesOf(B, c)) {
+      const dd = Math.hypot(e.x - c.x, e.z - c.z); if (dd > R) continue;
+      if (m === "front") { const { lx, lz } = toLocal(c, e.x, e.z); if (lx <= 0 || Math.abs(Math.atan2(lz, lx)) > arc) continue; }
+      if (dd < bd) { bd = dd; best = e; }
+    }
+    return best;
+  }
+  function triggerMet(B, c, m, p, manual) {
+    switch (p.trigger) {
+      case "manual": return c.human ? manual : aiWants(B, c, m, p);
+      case "ready": return enemiesOf(B, c).length > 0;
+      case "in_range": return !!targetFor(B, c, m, p);
+      case "enemy_near": return countNear(B, c, PARTS.emitter.radius) >= 1;
+      case "two_near": return countNear(B, c, PARTS.emitter.radius) >= 2;
+      case "hit_hard": return recentDmg(c) >= 12;
+      case "low_hp": return c.hp < c.d.hp * 0.35 && (p.part !== "boost" || enemiesOf(B, c).length > 0);
+      case "chasing": { const t = (c.ai.target && c.ai.target.alive) ? c.ai.target : (nearestEnemy(B, c) || {}).e; if (!t) return false; const { lx, lz } = toLocal(c, t.x, t.z); return lx > 6 && Math.abs(Math.atan2(lz, lx)) < 0.5; }
+      default: return false;
+    }
+  }
+  function aiWants(B, c, m, p) {
+    switch (p.part) {
+      case "launcher": case "hook": return !!targetFor(B, c, m, p);
+      case "emitter": return countNear(B, c, PARTS.emitter.radius) >= 1;
+      case "shield": return recentDmg(c) >= 9 || c.hp < c.d.hp * 0.3;
+      case "boost": { if (c.ai.flee > 0) return true; const t = c.ai.target; if (!t || !t.alive) return false; const { lx, lz } = toLocal(c, t.x, t.z); return lx > 7 && Math.abs(Math.atan2(lz, lx)) < 0.35; }
+      default: return false;
+    }
+  }
+  function weapons(B, c, dt, manual) {
+    for (const m of MOUNTS) {
+      const p = c.bp.mounts[m]; if (!p) continue;
+      const P = PARTS[p.part];
+      if (p.part === "ram") continue;
+      if (p.part === "saw") {
+        const dir = m === "front" ? [1, 0] : m === "left" ? [0, -1] : [0, 1];
+        const base = m === "front" ? c.d.r : c.d.half;
+        let hit = null;
+        for (const e of enemiesOf(B, c)) {
+          const { lx, lz } = toLocal(c, e.x, e.z), along = lx * dir[0] + lz * dir[1], across = Math.abs(lx * dir[1] - lz * dir[0]);
+          if (along > 0 && along < base + 0.9 + e.d.r && across < (m === "front" ? c.d.half : c.d.r) * 0.9 + e.d.r * 0.6) { hit = e; break; }
+        }
+        c.sawOn[m] = false;
+        if (hit) {
+          const need = P.energy * dt;
+          if (c.energy >= need) { c.energy -= need; c.tel.energyUsed += need; c.sawOn[m] = true; c.tel.fires[m] = (c.tel.fires[m] || 0) + dt; hurt(B, hit, P.dps[p.lvl] * dt, mountPoint(c, m), "saw", c); }
+          else starve(B, c, m);
+        }
+        continue;
+      }
+      if ((c.cd[m] || 0) > 0) continue;
+      if (!triggerMet(B, c, m, p, manual)) continue;
+      if (c.energy < P.energy) { starve(B, c, m); continue; }
+      if (fire(B, c, m, p)) { c.energy -= P.energy; c.tel.energyUsed += P.energy; c.cd[m] = P.cd; c.tel.fires[m] = (c.tel.fires[m] || 0) + 1; }
+    }
+  }
+  function fire(B, c, m, p) {
+    const P = PARTS[p.part];
+    switch (p.part) {
+      case "launcher": {
+        if ((c.ammo[m] || 0) <= 0) { if ((c.starveAt["ammo" + m] || 0) <= B.t) { c.tel.noAmmo++; c.starveAt["ammo" + m] = B.t + 3; } return false; }
+        const t = targetFor(B, c, m, p) || (m === "top" ? (nearestEnemy(B, c) || {}).e : null);
+        let ang;
+        if (t) { const dd = Math.hypot(t.x - c.x, t.z - c.z), tt = dd / P.speed; const px = t.x + t.vx * tt, pz = t.z + t.vz * tt; ang = Math.atan2(-(pz - c.z), px - c.x); }
+        else ang = c.h;
+        ang += (B.rng() - 0.5) * 0.08;
+        const o = mountPoint(c, m);
+        B.shots.push({ x: o.x, z: o.z, vx: Math.cos(ang) * P.speed, vz: -Math.sin(ang) * P.speed, life: P.range / P.speed + 0.1, owner: c, dmg: P.dmg[p.lvl], id: Math.floor(B.rng() * 1e9) });
+        c.ammo[m]--; c.tel.shots++;
+        B.events.push({ type: "shot", x: o.x, z: o.z, id: c.id, m, ang });
+        return true;
+      }
+      case "emitter": {
+        const hits = enemiesOf(B, c).filter((e) => Math.hypot(e.x - c.x, e.z - c.z) <= P.radius + e.d.r * 0.5);
+        B.events.push({ type: "pulse", x: c.x, z: c.z, r: P.radius, id: c.id });
+        const each = P.pool[p.lvl] / Math.max(1, hits.length);
+        for (const e of hits) hurt(B, e, each, c, "zap", c, "top");
+        return true;
+      }
+      case "shield": c.shieldT = P.dur[p.lvl]; B.events.push({ type: "shield", id: c.id }); return true;
+      case "boost": c.boostT = P.dur[p.lvl]; B.events.push({ type: "boost", id: c.id }); return true;
+      case "hook": {
+        const t = targetFor(B, c, m, p); if (!t) return false;
+        const dx = c.x - t.x, dz = c.z - t.z, dd = Math.hypot(dx, dz) || 1, pull = 15 / (t.d.mass * t.d.push / 8);
+        t.vx += dx / dd * pull; t.vz += dz / dd * pull; c.vx -= dx / dd * 2; c.vz -= dz / dd * 2; t.stunT = 0.6;
+        hurt(B, t, P.dmg, c, "hook", c);
+        B.events.push({ type: "hook", id: c.id, to: t.id, m });
+        return true;
+      }
+    }
+    return false;
+  }
+  function stepShots(B, dt) {
+    for (const s of B.shots) {
+      s.x += s.vx * dt; s.z += s.vz * dt; s.life -= dt;
+      if (Math.abs(s.x) > A || Math.abs(s.z) > A || PILLARS.some((P) => Math.hypot(s.x - P.x, s.z - P.z) < P.r)) { s.life = 0; B.events.push({ type: "pop", x: s.x, z: s.z }); continue; }
+      for (const e of B.cars) {
+        if (e === s.owner || !e.alive) continue;
+        if (Math.hypot(e.x - s.x, e.z - s.z) < e.d.r + 0.25) { s.owner.tel.hits++; hurt(B, e, s.dmg, { x: s.x - s.vx * 0.05, z: s.z - s.vz * 0.05 }, "rocket", s.owner); s.life = 0; B.events.push({ type: "pop", x: s.x, z: s.z, big: true }); break; }
+      }
+    }
+    B.shots = B.shots.filter((s) => s.life > 0);
+  }
+
+  /* AI drivers */
+  function aiDrive(B, c, dt) {
+    const ai = c.ai, foes = enemiesOf(B, c);
+    if (!foes.length) { c.ctl.thr = 0; c.ctl.steer = 0; return; }
+    ai.retarget -= dt;
+    if (!ai.target || !ai.target.alive || ai.retarget <= 0) {
+      let best = null, bs = 1e9;
+      for (const e of foes) { const s = Math.hypot(e.x - c.x, e.z - c.z) * (0.55 + 0.6 * e.hp / e.d.hp) + B.rng() * 6; if (s < bs) { bs = s; best = e; } }
+      ai.target = best; ai.retarget = 2 + B.rng() * 2;
+    }
+    const t = ai.target, dx = t.x - c.x, dz = t.z - c.z, dd = Math.hypot(dx, dz) || 1;
+    if (ai.flee > 0) ai.flee -= dt;
+    else if (c.hp < c.d.hp * 0.25 && dd < 7 && B.rng() < dt * 0.6) ai.flee = 2.5;
+    let gx, gz, thrMax = 1;
+    if (ai.flee > 0) {
+      gx = c.x - dx / dd * 10 - c.x * 0.3; gz = c.z - dz / dd * 10 - c.z * 0.3;
+    } else if (c.role === "ranged") {
+      if (dd < 7) { gx = c.x - dx / dd * 8 + (-dz / dd) * 4 * ai.bias; gz = c.z - dz / dd * 8 + (dx / dd) * 4 * ai.bias; }
+      else if (dd > 13) { gx = t.x; gz = t.z; }
+      else { gx = t.x; gz = t.z; thrMax = 0.55; }
+    } else if (c.role === "side") {
+      gx = t.x + (-dz / dd) * 2.2 * ai.bias; gz = t.z + (dx / dd) * 2.2 * ai.bias;
+      if (dd < 3) { gx = t.x + dx / dd * 4; gz = t.z + dz / dd * 4; }
+    } else if (c.role === "zapper") {
+      const near = foes.filter((e) => Math.hypot(e.x - c.x, e.z - c.z) < 14);
+      if (near.length > 1) { gx = near.reduce((s, e) => s + e.x, 0) / near.length; gz = near.reduce((s, e) => s + e.z, 0) / near.length; } else { gx = t.x; gz = t.z; }
+    } else {
+      const lead = Math.min(dd / 14, 0.8); gx = t.x + t.vx * lead; gz = t.z + t.vz * lead;
+    }
+    gx = clamp(gx, -A + 3, A - 3); gz = clamp(gz, -A + 3, A - 3);
+    let want = Math.atan2(-(gz - c.z), gx - c.x);
+    for (const P of PILLARS) {
+      const { lx, lz } = toLocal(c, P.x, P.z);
+      if (lx > 0 && lx < 6 && Math.abs(lz) < P.r + c.d.r + 0.4 && Math.hypot(gx - c.x, gz - c.z) > lx) want += (lz >= 0 ? 0.9 : -0.9);
+    }
+    const diff = wrapA(want - c.h);
+    if (ai.reverseT > 0) { ai.reverseT -= dt; c.ctl.thr = -1; c.ctl.steer = ai.revSteer; return; }
+    c.ctl.steer = clamp(diff * 2.4, -1, 1) * ai.skill;
+    c.ctl.thr = Math.abs(diff) > 2.1 && dd < 6 ? -0.7 : clamp(1.15 - Math.abs(diff) * 0.35, 0.35, thrMax);
+    const spd = Math.hypot(c.vx, c.vz);
+    if (spd < 0.9 && c.ctl.thr > 0) ai.stuck += dt; else ai.stuck = Math.max(0, ai.stuck - dt);
+    if (ai.stuck > 0.9) { ai.reverseT = 0.8; ai.revSteer = diff > 0 ? -1 : 1; ai.stuck = 0; }
+  }
+
+  function roundPoints(c) {
+    const ko = c.tel.kos * 3, dmg = Math.floor(c.tel.dealt / 25), surv = c.alive && c.tel.dealt >= 20 ? 2 : 0;
+    return { ko, dmg, surv, total: ko + dmg + surv };
+  }
+  const salvageOf = (c) => Math.min(SALVAGE_CAP, c.tel.kos + Math.floor(c.tel.dealt / 40));
+
+  /* =====================================================================
+     SCRIPTED CREW — candidate mods from telemetry (also the backup plan)
+     ===================================================================== */
+  const CAT = { armor: "defense", shield: "defense", chassis: "defense", treads: "defense",
+    motor: "mobility", slick: "mobility", boost: "mobility", battery: "power",
+    ram: "offense", saw: "offense", launcher: "offense", emitter: "offense", hook: "offense", rewire: "tuning", remove: "tuning" };
+  const INSTR = [
+    [/armou?r|tank|tough|durab|surviv|protect|defen/, ["armor", "chassis", "shield", "treads"]],
+    [/fast|speed|quick|zoom|motor|mobil/, ["motor", "slick", "boost"]],
+    [/range|shoot|gun|rocket|launch|snip|far/, ["launcher"]],
+    [/saw|melee|close|cut|shred|brawl/, ["saw", "ram", "hook"]],
+    [/ram|smash|push|bash/, ["ram", "treads", "chassis"]],
+    [/zap|emit|area|aoe|crowd/, ["emitter", "battery"]],
+    [/shield|bubble/, ["shield"]],
+    [/hook|grab|pull/, ["hook"]],
+    [/energy|battery|power/, ["battery"]],
+    [/boost|dash|nitro/, ["boost"]],
+  ];
+  function instrTags(s) { const t = new Set(); if (!s) return t; const l = s.toLowerCase(); for (const [re, tags] of INSTR) if (re.test(l)) tags.forEach((x) => t.add(x)); return t; }
+  function genCandidates(car, instr, weights) {
+    const bp = car.bp, t = car.tel || freshTel(), d = derive(bp), C = [], it = instrTags(instr);
+    const alive = Math.max(1, t.aliveT);
+    const add = (tag, op, score, title, reason, benefit, costTxt) => {
+      const r = applyOp(bp, op, car.credits, car.lock);
+      if (!r.ok || C.some((c) => c.res.label === r.label)) return;
+      C.push({ tag, cat: CAT[tag] || "offense", op, score: score * ((weights && weights[tag]) || 1) + (it.has(tag) ? 3 : 0) + car.rng() * 0.15, title, reason, benefit, cost: costTxt, res: r });
+    };
+    const has = (part) => MOUNTS.some((m) => bp.mounts[m] && bp.mounts[m].part === part);
+    const free = MOUNTS.filter((m) => !bp.mounts[m]);
+    const worst = SIDES.slice().sort((a, b) => t.takenSide[b] - t.takenSide[a])[0];
+    if (t.taken > 0 && bp.armor[worst] < 2) add("armor", { op: "armor", side: worst }, t.takenSide[worst] / Math.max(1, t.taken) * 1.6 + t.taken / 90, `${cap(worst)} armor`,
+      `${r0(t.takenSide[worst])} of the ${r0(t.taken)} damage you took came through your ${worst}.`, `−20% damage from the ${worst}`, "+1 weight, slightly slower");
+    for (const s of ["front", "left", "right"]) if (s !== worst && bp.armor[s] < 1) { add("armor", { op: "armor", side: s }, 0.25, `${cap(s)} armor`, `A plate on the ${s} covers the side rivals aim for next.`, `−20% damage from the ${s}`, "+1 weight"); break; }
+    add("motor", { op: "upgrade", target: "motor" }, t.time.far / alive * 2 + (t.dist / alive < 5 ? 0.6 : 0.15), "Bigger motor",
+      `You spent ${pct(t.time.far / alive)} of the round more than 11 m from anyone.`, "more top speed and acceleration", "+0.5 weight");
+    add("battery", { op: "upgrade", target: "battery" }, t.starved * 0.45 + (d.power >= d.slots ? 0.6 : 0), "Bigger battery",
+      t.starved ? `Weapons stalled ${t.starved}× on an empty battery.` : `All ${d.slots} power slots are in use, so there's no room for another weapon.`, "+2 power slots, +10 energy", "+0.5 weight");
+    if (!has("launcher")) for (const m of ["top", "front"]) if (free.includes(m)) { add("launcher", { op: "add", part: "launcher", mount: m, trigger: "in_range" }, (t.time.far + t.time.mid * 0.5) / alive * 2.4, `${cap(m)} rockets`,
+      `Rivals were out of reach ${pct((t.time.far + t.time.mid) / alive)} of the round.`, "hits from 16 m", "limited ammo, 2 power, heavy"); break; }
+    for (const m of ["left", "right", "front"]) if (free.includes(m)) { add("saw", { op: "add", part: "saw", mount: m, trigger: "contact" }, t.collisions / 7 + t.time.close / alive * 2, `${cap(m)} saw`,
+      `${t.collisions} collisions and ${pct(t.time.close / alive)} of the round up close.`, `shreds anything on your ${m}`, "drains energy while cutting"); break; }
+    if (free.includes("top") && !has("emitter")) add("emitter", { op: "add", part: "emitter", mount: "top", trigger: "enemy_near" }, t.crowdT / alive * 4 + 0.25, "Zap emitter",
+      t.crowdT > 2 ? `You had two or more rivals within 6 m for ${r0(t.crowdT)} s.` : "An area zap punishes anyone who crowds you.", "hits everyone within 4.5 m", "damage splits between targets, 3 power");
+    if (!has("shield")) for (const m of ["rear", "top"]) if (free.includes(m)) { add("shield", { op: "add", part: "shield", mount: m, trigger: "hit_hard" }, t.hardHits * 0.4 + t.taken / 120, "Shield",
+      `You took ${t.hardHits} big hits (12+ damage within a second).`, "blocks 65% for 2 s", "8 energy, 9 s cooldown"); break; }
+    if (!has("boost") && free.includes("rear")) add("boost", { op: "add", part: "boost", mount: "rear", trigger: car.human ? "manual" : "chasing" }, t.time.far / alive * 1.4 + 0.2, "Rear booster",
+      `Targets got away: ${pct(t.time.far / alive)} of the round at long range.`, car.human ? "burst of speed on SPACE" : "burst of speed when chasing", "6 energy per use");
+    if (!has("hook")) for (const m of ["top", "front"]) if (free.includes(m)) { add("hook", { op: "add", part: "hook", mount: m, trigger: "in_range" }, t.time.mid / alive * 1.6 + (has("saw") || has("ram") ? 0.4 : 0), "Grab hook",
+      `You hovered at mid range ${pct(t.time.mid / alive)} of the round. A hook drags rivals into your weapons.`, "pulls a rival in from 9 m", "5 energy, 5 s cooldown"); break; }
+    if (!has("ram") && free.includes("front")) add("ram", { op: "add", part: "ram", mount: "front", trigger: "contact" }, t.collisions / 9 + 0.15, "Ram wedge",
+      `${t.collisions} collisions, and none of them did real damage.`, "big head-on hits, no energy", "nose-first only");
+    const ups = MOUNTS.filter((m) => bp.mounts[m] && bp.mounts[m].lvl < 2);
+    ups.sort((a, b) => (t.dealtSrc[srcOf(bp.mounts[b].part)] || 0) - (t.dealtSrc[srcOf(bp.mounts[a].part)] || 0));
+    if (ups[0]) { const m = ups[0], p = bp.mounts[m], dealt = r0(t.dealtSrc[srcOf(p.part)] || 0);
+      add(p.part, { op: "upgrade", target: m }, dealt / Math.max(1, t.dealt) * 1.8 + 0.35, `${PARTS[p.part].short.toLowerCase().replace(/^./, (x) => x.toUpperCase())} Mk 2`,
+        dealt ? `Your ${PARTS[p.part].name.toLowerCase()} did ${dealt} of your ${r0(t.dealt)} damage, so double down.` : `A Mk 2 ${PARTS[p.part].name.toLowerCase()} hits harder.`, "stronger version of what works", "+0.5 weight"); }
+    if (bp.wheels !== "treads") add("treads", { op: "swap", target: "wheels", to: "treads" }, ((t.takenSrc.bump || 0) + (t.takenSrc.ram || 0)) / Math.max(1, t.taken) * 1.6 + 0.1, "Treads",
+      `Bumps and rams did ${r0((t.takenSrc.bump || 0) + (t.takenSrc.ram || 0))} damage to you, so you're getting shoved around.`, "more grip, harder to push", "lower top speed");
+    if (bp.wheels !== "slick") add("slick", { op: "swap", target: "wheels", to: "slick" }, t.time.far / alive * 1.1, "Slick wheels",
+      `Too slow to close gaps: ${pct(t.time.far / alive)} of the round at long range.`, "+15% top speed", "slides in turns, easier to push");
+    if (bp.chassis !== "heavy") add("chassis", { op: "swap", target: "chassis", to: bp.chassis === "light" ? "standard" : "heavy" }, t.taken / 100 + (d.load > d.carry - 1.5 ? 0.6 : 0), "Heavier frame",
+      d.load > d.carry - 1.5 ? `You're at ${d.load.toFixed(1)}/${d.carry} weight, so a bigger frame carries more.` : `You took ${r0(t.taken)} damage.`, "more HP and carry weight", "heavier and slower");
+    for (const m of MOUNTS) { const p = bp.mounts[m]; if (!p) continue; const P = PARTS[p.part]; if (P.triggers.length < 2) continue;
+      const fired = r0(t.fires[m] || 0), alt = P.triggers.find((x) => x !== p.trigger && x !== (car.human ? "" : "manual")) || P.triggers.find((x) => x !== p.trigger);
+      add("rewire", { op: "rewire", mount: m, trigger: alt }, fired === 0 ? 0.8 : 0.1, `Rewire ${P.short.toLowerCase()}`,
+        `Your ${P.name.toLowerCase()} fired ${fired}× last round. It could fire ${TRIG[alt].short} instead.`, "free", "changes when it fires"); }
+    if (car.credits < 3) for (const m of MOUNTS) { const p = bp.mounts[m]; if (!p) continue; const dealt = r0(t.dealtSrc[srcOf(p.part)] || 0);
+      if (dealt < 6 && !["shield", "boost"].includes(p.part)) add("remove", { op: "remove", mount: m }, 0.3, `Drop the ${PARTS[p.part].short.toLowerCase()}`, `Your ${PARTS[p.part].name.toLowerCase()} did ${dealt} damage last round.`, `refund ${Math.floor(partValue(p) / 2)} credits, lighter`, "one less weapon"); }
+    return C.sort((a, b) => b.score - a.score);
+  }
+  const srcOf = (part) => part === "launcher" ? "rocket" : part === "emitter" ? "zap" : part;
+  function pickTwo(C) {
+    if (!C.length) return [];
+    const a = C[0], b = C.find((c) => c !== a && c.cat !== a.cat) || C.find((c) => c !== a && c.tag !== a.tag) || C[1];
+    return b ? [a, b] : [a];
+  }
+  function scriptedObservation(car) {
+    const t = car.tel; if (!t) return "Fresh car, so there's no telemetry yet.";
+    const worst = SIDES.slice().sort((a, b) => t.takenSide[b] - t.takenSide[a])[0];
+    const acc = t.shots ? `, ${t.hits}/${t.shots} rockets hit` : "";
+    return `Dealt ${r0(t.dealt)}, took ${r0(t.taken)} (mostly ${worst}), ${t.collisions} collisions${acc}${t.starved ? `, battery ran dry ${t.starved}×` : ""}.`;
+  }
+  function scriptedCrew(car, instr) {
+    const C = genCandidates(car, instr, car.weights);
+    return { who: "scripted", observation: scriptedObservation(car), options: pickTwo(C).map(optFromCand), notes: [] };
+  }
+  const optFromCand = (c) => ({ op: c.op, title: c.title, reason: c.reason, benefit: c.benefit, cost: c.cost, res: c.res });
+
+  /* =====================================================================
+     CLAUDE CREW — sample capability, deadline, validation retry, fallback
+     ===================================================================== */
+  let sampleFn = null;
+  const CATALOG_TXT = () => Object.entries(PARTS).map(([k, P]) =>
+    `- ${k}: ${P.cost} cr, weight ${P.mass}, power ${P.power}, mounts [${P.mounts.join("/")}], triggers [${P.triggers.join("/")}]${P.energy ? `, ${P.energy} energy${p_rate(k)}` : ""}${P.cd ? `, ${P.cd}s cooldown` : ""}. ${P.desc} Mk2 upgrade ${upCost(P)} cr.`).join("\n");
+  const p_rate = (k) => k === "saw" ? "/s" : "/use";
+  function crewPrompt(car, instr, retry) {
+    const d = derive(car.bp), t = car.tel, rivals = M.cars.filter((c) => c !== car);
+    const hist = car.history.length ? car.history.map((h) => `R${h.round}: ${h.label || "kept build"}. Next round, dealt ${r0(h.after ? h.after.dealt : 0)}, took ${r0(h.after ? h.after.taken : 0)}, scored ${h.after ? h.after.pts : "?"} pts.`).join("\n") : "none yet";
+    const prof = profileSummary();
+    let s = `You are the pit-crew chief for the human driver "YOU" in Pit Crew Arena, a 4-car toy battle game with 5 rounds of 60 seconds. Round ${M.round} of ${ROUNDS} just ended. You may make ONE modification per pit stop.
+
+Propose exactly TWO different legal modifications with real trade-offs. For example, one defensive and one offensive, not two versions of the same idea. The game owns all the numbers. You choose parts, mounts and triggers only.
+
+PARTS (cost, weight, power slots used, allowed mounts, triggers):
+${CATALOG_TXT()}
+CORE: chassis light(85hp, carries 9)/standard(115hp, 11)/heavy(150hp, 13), swap cost 1 + price difference. Wheels slick(fast, slides)/offroad/treads(grip, hard to push, slow), swap 2 cr. Motor Mk1-3 and battery Mk1-3 (power slots 4/6/8, energy 24/34/44) cost ${CORE_UPGRADE} cr per level. Armor per side (front/left/right/rear/top) 0-2 costs ${ARMOR_COST} cr per level; each level cuts damage from that side by 20%. Zap damage hits top armor. Removing a part refunds half its value.
+
+TRIGGERS: ${Object.entries(TRIG).map(([k, v]) => `${k} = ${v.text}`).join("; ")}.
+
+OPS (use exactly these JSON shapes):
+{"op":"add","part":"saw","mount":"left","trigger":"contact"}
+{"op":"replace","mount":"front","part":"launcher","trigger":"in_range"}
+{"op":"remove","mount":"top"}
+{"op":"upgrade","target":"front"}  (a mount's part to Mk2, or "motor" / "battery")
+{"op":"armor","side":"left"}
+{"op":"swap","target":"wheels","to":"treads"}  (or "chassis")
+{"op":"rewire","mount":"top","trigger":"hit_hard"}
+
+LIMITS: cost must be at most your credits. Total power must fit the battery slots, and weight must fit the chassis carry limit. The locked part can be upgraded but never removed, replaced, swapped or rewired.
+
+CURRENT BUILD: ${JSON.stringify(car.bp)}
+= ${buildSummary(car.bp)}
+DERIVED: ${d.hp} hp, top speed ${d.top.toFixed(1)}, power ${d.power}/${d.slots}, weight ${d.load.toFixed(1)}/${d.carry}
+CREDITS: ${car.credits}
+LOCKED: ${car.lock || "nothing"}
+
+LAST ROUND TELEMETRY (YOU): alive ${r0(t.aliveT)}s of ${r0(M.lastRoundT || ROUND_TIME)}s${car.lastAlive ? "" : " (wrecked)"}; dealt ${r0(t.dealt)} by source ${JSON.stringify(roundObj(t.dealtSrc))}; took ${r0(t.taken)} by side ${JSON.stringify(roundObj(t.takenSide))} and by source ${JSON.stringify(roundObj(t.takenSrc))}; collisions ${t.collisions}; time close(<4.5m) ${r0(t.time.close)}s, mid ${r0(t.time.mid)}s, far(>11m) ${r0(t.time.far)}s; 2+ rivals within 6m for ${r0(t.crowdT)}s; big hits taken ${t.hardHits}; rockets ${t.hits}/${t.shots} hit; out of ammo ${t.noAmmo}×; empty-battery stalls ${t.starved}; energy used ${r0(t.energyUsed)}; wrecks ${t.kos}.
+
+OPPONENTS (what you can see):
+${rivals.map((c) => `- ${c.name}: ${buildSummary(c.bp)}; score ${c.score}${c.lastChange ? `; last change: ${c.lastChange}` : ""}`).join("\n")}
+SCORE: YOU ${car.score}, round ${M.round}/${ROUNDS}.
+
+UPGRADE HISTORY AND RESULTS:
+${hist}
+DRIVER PROFILE: ${prof}
+DRIVER INSTRUCTION: ${instr ? `"${instr.slice(0, 120)}". Treat this as a design request. Follow it when it's legal; if it can't be done, say why in the observation.` : "none"}
+
+Reply with JSON only:
+{"observation":"one sentence about what happened last round that cites a number","options":[{"op":{...},"title":"2-4 words","reason":"one sentence on why","benefit":"max 8 words","cost":"max 8 words"},{...}]}`;
+    if (retry) s += `\n\nYOUR PREVIOUS ANSWER: ${JSON.stringify(retry.prev).slice(0, 1200)}\nTHE VALIDATOR REJECTED: ${retry.bad.map((b) => `option ${b.tag}: ${b.errors.join(" ")}`).join(" | ")}\nReturn the full JSON again with two legal options.`;
+    return s;
+  }
+  const roundObj = (o) => { const r = {}; for (const k in o) if (o[k] >= 0.5) r[k] = r0(o[k]); return r; };
+  function checkOptions(car, out) {
+    const good = [], bad = [];
+    const list = out && Array.isArray(out.options) ? out.options.slice(0, 2) : [];
+    list.forEach((o, i) => {
+      const tag = "AB"[i], op = normalizeOp(o && o.op), res = applyOp(car.bp, op, car.credits, car.lock);
+      if (!res.ok) { bad.push({ tag, errors: res.errors.length ? res.errors : ["Invalid op."], op }); return; }
+      if (good.some((g) => g.res.label === res.label)) { bad.push({ tag, errors: ["Same change as option A. Offer a different trade-off."], op }); return; }
+      const str = (v, n) => String(v || "").replace(/\s+/g, " ").trim().slice(0, n);
+      good.push({ op, res, title: str(o.title, 40) || res.label, reason: str(o.reason, 180), benefit: str(o.benefit, 60), cost: str(o.cost, 60) });
+    });
+    if (!list.length) bad.push({ tag: "A", errors: ["No options array."] });
+    return { good, bad };
+  }
+  async function crewPropose(car, instr, deadlineMs) {
+    const backup = scriptedCrew(car, instr);
+    if (!sampleFn) return backup;
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), deadlineMs);
+    crewAbort = ctl;
+    const notes = [];
+    try {
+      let out = await sampleFn.json(crewPrompt(car, instr), { modelTier: "quick", cache: false, signal: ctl.signal });
+      let chk = checkOptions(car, out);
+      if (chk.bad.length) {
+        notes.push(...chk.bad.map((b) => `Validator rejected crew idea ${b.tag}: ${b.errors[0]}`));
+        try {
+          const out2 = await sampleFn.json(crewPrompt(car, instr, { prev: out, bad: chk.bad }), { modelTier: "quick", cache: false, signal: ctl.signal });
+          const c2 = checkOptions(car, out2);
+          if (c2.good.length >= chk.good.length) { out = out2; chk = c2; notes.push(c2.bad.length ? "The retry still had an illegal idea, so the backup crew filled the gap." : "The crew fixed it on the retry."); }
+        } catch (e) { notes.push("No time for a retry, so the backup crew filled the gap."); }
+      }
+      clearTimeout(timer);
+      const opts = chk.good.slice(0, 2);
+      for (const b of backup.options) { if (opts.length >= 2) break; if (!opts.some((o) => o.res.label === b.res.label)) opts.push({ ...b, backup: true }); }
+      return { who: "claude", observation: String((out && out.observation) || "").replace(/\s+/g, " ").slice(0, 240) || backup.observation, options: opts, notes };
+    } catch (e) {
+      clearTimeout(timer);
+      const code = e && e.code;
+      if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed", "unsupported"].includes(code)) { sampleFn = null; updateCrewMode(); }
+      const why = code === "cancelled" ? "The crew chief missed the deadline, so this is the backup crew's plan."
+        : code === "rate_limited" ? "The crew chief is rate-limited right now, so this is the backup crew's plan."
+        : code === "not_granted" ? "Claude access wasn't granted, so the backup crew is on."
+        : "The crew radio dropped, so this is the backup crew's plan.";
+      return { ...backup, notes: [why] };
+    } finally { if (crewAbort === ctl) crewAbort = null; }
+  }
+  let crewAbort = null;
+
+  /* =====================================================================
+     RENDERER / SCENE
+     ===================================================================== */
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+  catch (e) { stage.insertAdjacentHTML("beforeend", '<div class="nogl">This page needs WebGL, which is turned off in your browser.</div>'); return; }
+  const lin = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+  const GROUND = 0xf3a462;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.background = lin(GROUND);
+  scene.fog = new THREE.Fog(lin(GROUND), 90, 180);
+  const camera = new THREE.PerspectiveCamera(36, 1, 0.5, 600);
+  scene.add(new THREE.HemisphereLight(lin(0xfff4e0), lin(0xd07a40), 0.75));
+  const sun = new THREE.DirectionalLight(lin(0xfff1dc), 0.95);
+  sun.position.set(-14, 34, 18); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 90 }); sun.shadow.bias = -0.0006;
+  scene.add(sun);
+
+  const rboxCache = {}, cachedGeo = new Set();
+  function rbox(w, h, d, r = 0.12) {
+    const key = [w, h, d, r].join(",");
+    if (rboxCache[key]) return rboxCache[key];
+    const s = new THREE.Shape(), iw = w - 2 * r, ih = h - 2 * r, c = Math.min(r, iw / 2, ih / 2) * 0.6;
+    const x = -iw / 2, y = -ih / 2;
+    s.moveTo(x + c, y); s.lineTo(x + iw - c, y); s.quadraticCurveTo(x + iw, y, x + iw, y + c);
+    s.lineTo(x + iw, y + ih - c); s.quadraticCurveTo(x + iw, y + ih, x + iw - c, y + ih);
+    s.lineTo(x + c, y + ih); s.quadraticCurveTo(x, y + ih, x, y + ih - c);
+    s.lineTo(x, y + c); s.quadraticCurveTo(x, y, x + c, y);
+    const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.01, d - 2 * r), bevelEnabled: true, bevelThickness: r, bevelSize: r, bevelSegments: 3, curveSegments: 4 });
+    g.translate(0, 0, -(d - 2 * r) / 2); g.computeVertexNormals();
+    rboxCache[key] = g; cachedGeo.add(g); return g;
+  }
+  const MATS = {};
+  function mat(color, o = {}) {
+    const key = color + "|" + (o.r ?? "") + (o.m ?? "") + (o.e ?? "") + (o.flat ? "f" : "");
+    return MATS[key] || (MATS[key] = new THREE.MeshStandardMaterial({ color: lin(color), roughness: o.r ?? 0.55, metalness: o.m ?? 0.05, emissive: o.e ? lin(o.e) : new THREE.Color(0), emissiveIntensity: o.ei ?? 1, flatShading: !!o.flat }));
+  }
+  const shadowy = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
+  const mesh = (g, m) => shadowy(new THREE.Mesh(g, m));
+
+  /* arena */
+  (function buildArena() {
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), mat(GROUND, { r: 0.95 }));
+    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+    const floor = new THREE.Mesh(rbox(2 * A + 1.6, 2 * A + 1.6, 0.2, 0.08), mat(0xf7c08e, { r: 0.9 }));
+    floor.rotation.x = -Math.PI / 2; floor.position.y = -0.05; floor.receiveShadow = true; scene.add(floor);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(5.6, 6, 64), new THREE.MeshBasicMaterial({ color: lin(0xffffff), transparent: true, opacity: 0.55 }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.07; scene.add(ring);
+    const colors = [0x2f80ff, 0xe2402c, 0x22a867, 0x7b3fe4];
+    STARTS.forEach((s, i) => { const pad = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ color: lin(colors[i]), transparent: true, opacity: 0.28 })); pad.rotation.x = -Math.PI / 2; pad.position.set(s.x, 0.06, s.z); scene.add(pad); });
+    const stripe = [0xffffff, 0xff5a36];
+    const seg = 3.5, n = Math.round(2 * A / seg);
+    for (let side = 0; side < 4; side++) for (let i = 0; i < n + 1; i++) {
+      const t = -A + i * (2 * A / n);
+      const m = mesh(rbox(2 * A / n - 0.1, 0.9, 0.9, 0.2), mat(stripe[(i + side) % 2], { r: 0.5 }));
+      if (side < 2) m.position.set(t, 0.45, side === 0 ? -A - 0.5 : A + 0.5);
+      else { m.rotation.y = Math.PI / 2; m.position.set(side === 2 ? -A - 0.5 : A + 0.5, 0.45, t); }
+      scene.add(m);
+    }
+    for (const P of PILLARS) {
+      const g = new THREE.Group(); g.position.set(P.x, 0, P.z);
+      for (let k = 0; k < 4; k++) { const c = mesh(new THREE.CylinderGeometry(P.r, P.r, 0.5, 28), mat(k % 2 ? 0xffffff : 0xe2402c, { r: 0.45 })); c.position.y = 0.25 + k * 0.5; g.add(c); }
+      const cap2 = mesh(new THREE.SphereGeometry(P.r * 0.6, 20, 12), mat(0xffb703)); cap2.position.y = 2.2; g.add(cap2);
+      scene.add(g);
+    }
+    const rng = mulberry32(7);
+    for (let i = 0; i < 46; i++) {
+      const ang = rng() * Math.PI * 2, rr = A + 6 + rng() * 26, x = Math.cos(ang) * rr, z = Math.sin(ang) * rr;
+      if (z > A + 4 && Math.abs(x) < 26 && rng() < 0.8) continue;
+      const kind = rng();
+      if (kind < 0.55) { const g = new THREE.Group(); const trunk = mesh(new THREE.CylinderGeometry(0.2, 0.28, 1.2, 8), mat(0x8a5a3c)); trunk.position.y = 0.6; g.add(trunk);
+        const s = 1 + rng() * 0.8; const top = mesh(new THREE.SphereGeometry(1.2 * s, 12, 10), mat([0x3fb56b, 0x57c27a, 0x2e9e5b][i % 3], { flat: true })); top.position.y = 1.6 + s; g.add(top); g.position.set(x, 0, z); scene.add(g); }
+      else if (kind < 0.8) { const c = mesh(rbox(1.4, 1.4, 1.4, 0.12), mat(0xd9a066)); c.position.set(x, 0.7, z); c.rotation.y = rng() * 3; scene.add(c); }
+      else { const c = mesh(new THREE.ConeGeometry(0.4, 1, 14), mat(0xff7a1a)); c.position.set(x, 0.5, z); scene.add(c); }
+    }
+  })();
+
+  /* car builder: every part is its own child group, keyed like the validator */
+  function buildCar(bp, color) {
+    const [L, H, W] = CHASSIS[bp.chassis].size;
+    const root = new THREE.Group(), parts = {};
+    const R = { group: root, parts, wheels: [], saws: {}, flames: [], turrets: {}, orbs: [], bubble: null, bodyMat: null, L, H, W };
+    const wr = bp.wheels === "offroad" ? 0.42 : bp.wheels === "treads" ? 0.34 : 0.36;
+    const baseY = wr + 0.06, bodyY = baseY + H / 2;
+    const P = (key) => { const g = new THREE.Group(); g.userData.key = key; root.add(g); parts[key] = g; return g; };
+    const steel = mat(0x9aa3ad, { r: 0.35, m: 0.35 }), dark = mat(0x2b2521, { r: 0.7 }), cream = mat(0xfff3e6), gold = mat(0xffb703);
+    const ch = P("chassis");
+    R.bodyMat = new THREE.MeshStandardMaterial({ color: lin(color), roughness: 0.45 });
+    const body = mesh(rbox(L, H, W, Math.min(0.16, H * 0.28)), R.bodyMat); body.position.y = bodyY; ch.add(body);
+    for (const z of [-W * 0.28, W * 0.28]) { const hl = mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 14), mat(0xfff8d6, { e: 0xffe9a0, ei: 0.4 })); hl.rotation.z = Math.PI / 2; hl.position.set(L / 2 + 0.02, bodyY + H * 0.12, z); ch.add(hl); }
+    if (bp.chassis === "light") { const st = mesh(new THREE.BoxGeometry(L * 0.9, 0.02, W * 0.18), cream); st.position.set(0, baseY + H + 0.01, 0); ch.add(st); }
+    if (bp.chassis === "heavy") for (const z of [-W / 2, W / 2]) { const rail = mesh(rbox(L * 0.9, 0.16, 0.12, 0.05), dark); rail.position.set(0, baseY + 0.1, z); ch.add(rail); }
+    const wg = P("wheels");
+    if (bp.wheels === "treads") {
+      for (const z of [-(W / 2 + 0.2), W / 2 + 0.2]) {
+        const tr = mesh(rbox(L * 1.02, 0.64, 0.38, 0.15), dark); tr.position.set(0, 0.34, z); wg.add(tr);
+        for (let i = -1; i <= 1; i++) { const hub = mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.42, 12), cream); hub.rotation.x = Math.PI / 2; hub.position.set(i * L * 0.33, 0.34, z); wg.add(hub); }
+      }
+    } else {
+      const w = bp.wheels === "slick" ? 0.24 : 0.34;
+      for (const x of [L * 0.32, -L * 0.32]) for (const z of [-(W / 2 + w / 2), W / 2 + w / 2]) {
+        const g = new THREE.Group(); g.position.set(x, wr, z);
+        const tire = mesh(new THREE.CylinderGeometry(wr, wr, w, bp.wheels === "offroad" ? 9 : 18), bp.wheels === "offroad" ? mat(0x2b2521, { r: 0.8, flat: true }) : dark);
+        tire.rotation.x = Math.PI / 2; g.add(tire);
+        const hub = mesh(new THREE.CylinderGeometry(wr * 0.45, wr * 0.45, w + 0.02, 12), cream); hub.rotation.x = Math.PI / 2; g.add(hub);
+        wg.add(g); R.wheels.push(tire, hub);
+      }
+    }
+    const topArmor = bp.armor.top ? 0.07 + 0.06 * bp.armor.top : 0;
+    const topY = baseY + H + topArmor;
+    const mg = P("motor");
+    for (let i = 0; i < bp.motor; i++) { const pipe = mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.46, 10), steel); pipe.position.set(-L * 0.42, topY + 0.18, (i - (bp.motor - 1) / 2) * 0.2); pipe.rotation.z = 0.5; mg.add(pipe); }
+    const bg = P("battery");
+    const bat = mesh(rbox(0.42, 0.22, W * 0.5, 0.05), dark); bat.position.set(-L * 0.2, topY + 0.11, 0); bg.add(bat);
+    for (let i = 0; i < bp.battery; i++) { const cell = mesh(new THREE.BoxGeometry(0.1, 0.05, W * 0.12), mat(0x36b6ff, { e: 0x36b6ff, ei: 0.6 })); cell.position.set(-L * 0.2 - 0.12 + i * 0.12, topY + 0.24, 0); bg.add(cell); }
+    for (const s of SIDES) {
+      const lv = bp.armor[s]; if (!lv) continue;
+      const g = P("armor:" + s), t = 0.07 + 0.06 * lv, m2 = lv === 2 ? mat(0x6f7883, { r: 0.35, m: 0.4 }) : steel;
+      let pl;
+      if (s === "front" || s === "rear") { pl = mesh(rbox(t, H * 0.86, W * 0.94, 0.03), m2); pl.position.set((L / 2 + t / 2) * (s === "front" ? 1 : -1), bodyY, 0); }
+      else if (s === "top") { pl = mesh(rbox(L * 0.6, t, W * 0.72, 0.03), m2); pl.position.set(0.05, baseY + H + t / 2, 0); }
+      else { pl = mesh(rbox(L * 0.34, H * 0.8, t, 0.03), m2); pl.position.set(0, bodyY + 0.04, (W / 2 + t / 2 + (bp.wheels === "treads" ? 0.42 : 0)) * (s === "left" ? -1 : 1)); }
+      g.add(pl);
+      const bolt = new THREE.SphereGeometry(0.035, 6, 5);
+      for (let k = 0; k < 2 * lv; k++) { const b = new THREE.Mesh(bolt, dark); b.position.copy(pl.position); const off = (k / Math.max(1, 2 * lv - 1) - 0.5) * 0.5;
+        if (s === "front" || s === "rear") { b.position.x += (s === "front" ? 1 : -1) * t / 2; b.position.z += off; }
+        else if (s === "top") { b.position.y += t / 2; b.position.x += off; }
+        else { b.position.z += (s === "left" ? -1 : 1) * t / 2; b.position.x += off; }
+        g.add(b); }
+    }
+    for (const m of MOUNTS) {
+      const p = bp.mounts[m]; if (!p) continue;
+      const g = P("mount:" + m), inner = new THREE.Group(); g.add(inner);
+      const ext = (s) => (bp.armor[s] ? 0.07 + 0.06 * bp.armor[s] : 0);
+      if (m === "front") g.position.set(L / 2 + ext("front"), bodyY - 0.05, 0);
+      else if (m === "rear") { g.position.set(-L / 2 - ext("rear"), bodyY, 0); g.rotation.y = Math.PI; }
+      else if (m === "left") { g.position.set(0, baseY + H * 0.85, -(W / 2 + (bp.wheels === "treads" ? 0.42 : 0.05))); g.rotation.y = Math.PI / 2; }
+      else if (m === "right") { g.position.set(0, baseY + H * 0.85, W / 2 + (bp.wheels === "treads" ? 0.42 : 0.05)); g.rotation.y = -Math.PI / 2; }
+      else g.position.set(L * 0.14, topY, 0);
+      buildPart(R, inner, p, m, W, H);
+    }
+    if (MOUNTS.some((m) => bp.mounts[m] && bp.mounts[m].part === "shield")) {
+      R.bubble = new THREE.Mesh(new THREE.SphereGeometry(L * 0.85, 24, 16), new THREE.MeshStandardMaterial({ color: lin(0x7fd3ff), transparent: true, opacity: 0.28, emissive: lin(0x36b6ff), emissiveIntensity: 0.35, depthWrite: false }));
+      R.bubble.position.y = bodyY; R.bubble.visible = false; root.add(R.bubble);
+    }
+    R.topY = topY;
+    return R;
+  }
+  function buildPart(R, g, p, m, W, H) {
+    const steel = mat(0x9aa3ad, { r: 0.35, m: 0.35 }), dark = mat(0x2b2521, { r: 0.7 }), gold = mat(0xffb703), orange = mat(0xff5a36);
+    switch (p.part) {
+      case "ram": {
+        const len = 0.5 + 0.2 * p.lvl, h = H * 0.9, s = new THREE.Shape();
+        s.moveTo(0, -h / 2); s.lineTo(len, -h / 2); s.lineTo(0, h / 2); s.lineTo(0, -h / 2);
+        const geo = new THREE.ExtrudeGeometry(s, { depth: W * 0.98, bevelEnabled: false }); geo.translate(0, 0, -W * 0.49);
+        g.add(mesh(geo, gold));
+        for (let i = 0; i < 3; i++) { const st = mesh(new THREE.BoxGeometry(0.06, 0.02, W * 0.98), dark); const f = 0.25 + i * 0.25; st.position.set(len * f, -h / 2 + h * (1 - f) + 0.005, 0); st.rotation.z = -Math.atan2(h, len); g.add(st); }
+        if (p.lvl > 1) for (const z of [-W * 0.3, 0, W * 0.3]) { const sp = mesh(new THREE.ConeGeometry(0.09, 0.4, 10), steel); sp.rotation.z = -Math.PI / 2; sp.position.set(len * 0.45, -h * 0.05, z); g.add(sp); }
+        break;
+      }
+      case "saw": {
+        const rad = 0.42 + 0.12 * p.lvl;
+        const arm = mesh(new THREE.BoxGeometry(0.4, 0.1, 0.16), dark); arm.position.set(0.2, 0, 0); g.add(arm);
+        const disk = new THREE.Group(); disk.position.set(0.35 + rad * 0.8, 0.02, 0);
+        disk.add(mesh(new THREE.CylinderGeometry(rad, rad, 0.05, 24), steel));
+        for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, tooth = mesh(new THREE.ConeGeometry(0.06, 0.16, 4), steel); tooth.position.set(Math.cos(a) * (rad + 0.05), 0, Math.sin(a) * (rad + 0.05)); tooth.rotation.set(Math.PI / 2, 0, -a - Math.PI / 2); disk.add(tooth); }
+        const hub = mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.1, 10), orange); disk.add(hub);
+        g.add(disk); R.saws[m] = disk;
+        break;
+      }
+      case "launcher": {
+        const tur = new THREE.Group(); g.add(tur);
+        if (m === "top") { const base = mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.16, 16), dark); base.position.y = 0.08; tur.add(base); R.turrets[m] = tur; }
+        const n = p.lvl, yb = m === "top" ? 0.26 : 0.05;
+        for (let i = 0; i < n; i++) {
+          const z = (i - (n - 1) / 2) * 0.24;
+          const barrel = mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.78, 14), mat(0x3a4a5a, { r: 0.4, m: 0.3 })); barrel.rotation.z = -Math.PI / 2; barrel.position.set(0.28, yb, z); tur.add(barrel);
+          const tip = mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 14), orange); tip.rotation.z = -Math.PI / 2; tip.position.set(0.68, yb, z); tur.add(tip);
+        }
+        break;
+      }
+      case "emitter": {
+        const pole = mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.6, 10), dark); pole.position.y = 0.3; g.add(pole);
+        for (let i = 0; i < 1 + p.lvl; i++) { const c = mesh(new THREE.TorusGeometry(0.2 - i * 0.03, 0.045, 8, 20), mat(0xc07a2a, { r: 0.3, m: 0.5 })); c.rotation.x = Math.PI / 2; c.position.y = 0.18 + i * 0.13; g.add(c); }
+        const orbM = new THREE.MeshStandardMaterial({ color: lin(0x9ff0ff), emissive: lin(0x36d6ff), emissiveIntensity: 0.9 });
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.13 + 0.04 * p.lvl, 16, 12), orbM); orb.position.y = 0.66; g.add(orb); R.orbs.push(orb);
+        break;
+      }
+      case "shield": {
+        if (m === "top") { const dome = mesh(new THREE.SphereGeometry(0.28, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xd8f3ff, { r: 0.3 })); g.add(dome);
+          const ring = mesh(new THREE.TorusGeometry(0.3, 0.035, 8, 24), mat(0x36b6ff, { e: 0x36b6ff, ei: 0.7 })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.03; g.add(ring); }
+        else { const box = mesh(rbox(0.25, 0.4, 0.6, 0.06), mat(0xd8f3ff, { r: 0.3 })); box.position.x = 0.1; g.add(box);
+          const ant = mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.6, 6), dark); ant.position.set(0.1, 0.45, 0); g.add(ant);
+          const tip = mesh(new THREE.SphereGeometry(0.07, 10, 8), mat(0x36b6ff, { e: 0x36b6ff, ei: 0.8 })); tip.position.set(0.1, 0.78, 0); g.add(tip); }
+        break;
+      }
+      case "boost": {
+        for (let i = 0; i < p.lvl; i++) { const z = (i - (p.lvl - 1) / 2) * 0.34;
+          const noz = mesh(new THREE.CylinderGeometry(0.13, 0.2, 0.38, 14), steel); noz.rotation.z = -Math.PI / 2; noz.position.set(0.18, 0, z); g.add(noz);
+          const fl = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.9, 12), new THREE.MeshBasicMaterial({ color: lin(0xffb703), transparent: true, opacity: 0.9 }));
+          fl.rotation.z = -Math.PI / 2; fl.position.set(0.8, 0, z); fl.visible = false; g.add(fl); R.flames.push(fl); }
+        break;
+      }
+      case "hook": {
+        const up = m === "top" ? 0.35 : 0;
+        const arm = mesh(new THREE.BoxGeometry(0.72, 0.08, 0.08), dark); arm.position.set(0.34, 0.12 + up, 0); arm.rotation.z = m === "top" ? -0.35 : 0; g.add(arm);
+        if (m === "top") { const post = mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.36, 8), dark); post.position.y = 0.18; g.add(post); }
+        const hk = mesh(new THREE.TorusGeometry(0.15 + 0.03 * p.lvl, 0.04, 6, 14, Math.PI * 1.3), steel); hk.position.set(0.72, 0.02 + up * 0.4, 0); hk.rotation.set(Math.PI / 2, 0, 0.6); g.add(hk);
+        break;
+      }
+    }
+  }
+  function disposeGroup(g) { g.traverse((o) => { if (o.material && o.userData.own) o.material.dispose(); if (o.geometry && !cachedGeo.has(o.geometry)) o.geometry.dispose(); }); }
+  function glowPart(R, key, list) {
+    const g = R.parts[key]; if (!g) return;
+    g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = lin(0xffb703); o.material.emissiveIntensity = 0.5; o.userData.own = true; list.push(o.material); } });
+    g.userData.pop = 0;
+  }
+  function ghostPart(g) {
+    const m = new THREE.MeshBasicMaterial({ color: lin(0xe2402c), transparent: true, opacity: 0.32, depthWrite: false });
+    g.traverse((o) => { if (o.isMesh) { o.material = m; o.castShadow = false; o.receiveShadow = false; } });
+  }
+  function buildDiffModel(bp, prev, color) {
+    const R = buildCar(bp, color); R.glow = [];
+    if (prev) {
+      const df = diffKeys(prev, bp);
+      for (const k of [...df.added, ...df.changed]) glowPart(R, k, R.glow);
+      R.popKeys = [...df.added, ...df.changed];
+      const ghosts = df.removed.filter((k) => !df.changed.includes(k) || k.startsWith("mount:"));
+      if (ghosts.length) {
+        const O = buildCar(prev, color);
+        for (const k of ghosts) { const g = O.parts[k]; if (!g) continue; ghostPart(g); if (df.changed.includes(k)) g.position.y += 0.9; R.group.add(g); }
+        disposeGroup(O.group);
+      }
+    }
+    return R;
+  }
+
+  /* camera fitting: fixed, slightly tilted, whole arena in frame */
+  const CAM_EL = 1.02;
+  const camPose = { arena: { pos: new THREE.Vector3(), look: new THREE.Vector3(0, 0, 1.2) }, lineup: { pos: new THREE.Vector3(), look: new THREE.Vector3(0, 0.8, 2) } };
+  function fitCam() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h;
+    camera.fov = w / h < 1 ? 46 : 36; camera.updateProjectionMatrix();
+    const corners = [[-A - 1.4, -A - 1.4], [A + 1.4, -A - 1.4], [-A - 1.4, A + 1.4], [A + 1.4, A + 1.4]];
+    const look = camPose.arena.look, v = new THREE.Vector3();
+    for (let D = 30; D < 200; D += 1.5) {
+      camera.position.set(look.x, look.y + D * Math.sin(CAM_EL), look.z + D * Math.cos(CAM_EL)); camera.lookAt(look); camera.updateMatrixWorld();
+      const ok = corners.every(([x, z]) => { v.set(x, 0.9, z).project(camera); return Math.abs(v.x) < 0.97 && v.y < 0.86 && v.y > -0.97; });
+      if (ok || D > 197) { camPose.arena.pos.copy(camera.position); break; }
+    }
+    const span = w / h < 1 ? 13 : 15, lk = camPose.lineup.look;
+    const hf = 2 * Math.atan(Math.tan(camera.fov * Math.PI / 360) * camera.aspect);
+    const D2 = Math.max(12, span / Math.tan(hf / 2) + 4);
+    camPose.lineup.pos.set(lk.x, lk.y + D2 * Math.sin(0.5), lk.z + D2 * Math.cos(0.5));
+  }
+  const camNow = { pos: new THREE.Vector3(0, 60, 40), look: new THREE.Vector3() };
+  let camMode = "arena", shake = 0;
+
+  /* labels */
+  function makeLabel() {
+    const c = document.createElement("canvas"); c.width = 256; c.height = 72;
+    const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
+    sp.scale.set(0.09, 0.0253, 1); sp.renderOrder = 10;
+    return { sp, c, tex, last: "" };
+  }
+  function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function drawLabel(lb, name, color, hpFrac, you) {
+    const key = name + "|" + Math.round(hpFrac * 40); if (lb.last === key) return; lb.last = key;
+    const g = lb.c.getContext("2d"); g.clearRect(0, 0, 256, 72);
+    g.font = "700 26px 'JetBrains Mono', monospace"; const tw = Math.min(200, g.measureText(name).width);
+    const bw = tw + 40, x = 128 - bw / 2;
+    rr(g, x, 4, bw, 36, 18); g.fillStyle = you ? "#2f80ff" : "#ffffff"; g.fill();
+    g.fillStyle = hexStr(color); g.beginPath(); g.arc(x + 18, 22, 7, 0, Math.PI * 2); g.fill();
+    g.fillStyle = you ? "#fff" : "#2b1d16"; g.textBaseline = "middle"; g.fillText(name, x + 30, 23, 200);
+    rr(g, 68, 48, 120, 12, 6); g.fillStyle = "rgba(43,29,22,0.35)"; g.fill();
+    if (hpFrac > 0) { rr(g, 68, 48, Math.max(12, 120 * hpFrac), 12, 6); g.fillStyle = hpFrac > 0.5 ? "#22a867" : hpFrac > 0.25 ? "#ffb703" : "#e2402c"; g.fill(); }
+    lb.tex.needsUpdate = true;
+  }
+
+  /* particles */
+  const NP = 420;
+  const pGeo = new THREE.BufferGeometry(), pPos = new Float32Array(NP * 3), pCol = new Float32Array(NP * 3);
+  pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3)); pGeo.setAttribute("color", new THREE.BufferAttribute(pCol, 3));
+  const pts = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.32, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }));
+  pts.frustumCulled = false; scene.add(pts);
+  const P_ = Array.from({ length: NP }, () => ({ life: 0, vx: 0, vy: 0, vz: 0, g: 1 }));
+  for (let i = 0; i < NP; i++) pPos[i * 3 + 1] = -50;
+  let pNext = 0;
+  function burst(x, y, z, n, color, spd = 6, up = 4, life = 0.6, grav = 1) {
+    const c = lin(color);
+    for (let k = 0; k < n; k++) {
+      const i = pNext; pNext = (pNext + 1) % NP; const p = P_[i];
+      const a = Math.random() * Math.PI * 2, s = spd * (0.3 + Math.random() * 0.7);
+      p.vx = Math.cos(a) * s; p.vz = Math.sin(a) * s; p.vy = up * (0.4 + Math.random()); p.life = life * (0.6 + Math.random() * 0.6); p.g = grav;
+      pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = z; pCol[i * 3] = c.r; pCol[i * 3 + 1] = c.g; pCol[i * 3 + 2] = c.b;
+    }
+  }
+  function stepParticles(dt) {
+    for (let i = 0; i < NP; i++) {
+      const p = P_[i]; if (p.life <= 0) continue;
+      p.life -= dt; if (p.life <= 0) { pPos[i * 3 + 1] = -50; continue; }
+      p.vy -= 14 * p.g * dt; pPos[i * 3] += p.vx * dt; pPos[i * 3 + 1] = Math.max(0.05, pPos[i * 3 + 1] + p.vy * dt); pPos[i * 3 + 2] += p.vz * dt;
+      p.vx *= 1 - 2 * dt; p.vz *= 1 - 2 * dt;
+    }
+    pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
+  }
+  const rings = Array.from({ length: 8 }, () => { const m = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48), new THREE.MeshBasicMaterial({ color: lin(0x5fe0ff), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; m.position.y = 0.3; m.visible = false; scene.add(m); return { m, t: 1, r: 1 }; });
+  function ring(x, z, r) { const R = rings.find((q) => q.t >= 1) || rings[0]; R.t = 0; R.r = r; R.m.position.x = x; R.m.position.z = z; R.m.visible = true; }
+  const shotMeshes = Array.from({ length: 40 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), new THREE.MeshBasicMaterial({ color: lin(0xff7a1a) })); m.visible = false; scene.add(m); return m; });
+  const hookLines = Array.from({ length: 4 }, () => { const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x2b1d16 })); l.visible = false; l.frustumCulled = false; scene.add(l); return { l, t: 0, a: null, b: null }; });
+
+  /* =====================================================================
+     PREVIEW + SNAPSHOT RENDERERS (pit stop, garage cards, reveal cards)
+     ===================================================================== */
+  function makeMiniScene() {
+    const s = new THREE.Scene(); s.background = lin(0xfde6d2);
+    s.add(new THREE.HemisphereLight(lin(0xfff4e0), lin(0xd07a40), 0.9));
+    const d = new THREE.DirectionalLight(0xffffff, 0.85); d.position.set(3, 7, 5); s.add(d);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.5, 0.12, 48), mat(0xf7c08e, { r: 0.9 })); disc.position.y = -0.06; s.add(disc);
+    return s;
+  }
+  const snap = (() => {
+    let r; try { r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); } catch (e) { return () => ""; }
+    r.setPixelRatio(1); r.setSize(320, 240); r.outputEncoding = THREE.sRGBEncoding;
+    const s = makeMiniScene(), cam = new THREE.PerspectiveCamera(30, 4 / 3, 0.1, 50);
+    cam.position.set(4.4, 3.4, 5.6); cam.lookAt(0, 0.6, 0);
+    return (bp, prev, color) => {
+      const R = buildDiffModel(bp, prev, color); R.group.rotation.y = -0.5; s.add(R.group);
+      r.render(s, cam); const url = r.domElement.toDataURL("image/png");
+      s.remove(R.group); disposeGroup(R.group); return url;
+    };
+  })();
+  const PV = (() => {
+    let r; try { r = new THREE.WebGLRenderer({ antialias: true }); } catch (e) { return { show() {}, tick() {}, attach() {} }; }
+    r.setPixelRatio(Math.min(devicePixelRatio, 2)); r.outputEncoding = THREE.sRGBEncoding;
+    const s = makeMiniScene(), cam = new THREE.PerspectiveCamera(30, 4 / 3, 0.1, 50);
+    let cur = null, ang = -0.6, t = 0;
+    return {
+      attach(host) { if (r.domElement.parentNode !== host) host.prepend(r.domElement); },
+      show(bp, prev, color) { if (cur) { s.remove(cur.group); disposeGroup(cur.group); } cur = buildDiffModel(bp, prev, color); s.add(cur.group); },
+      tick(dt) {
+        const host = r.domElement.parentNode; if (!host || !cur) return;
+        const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
+        if (r.domElement.width !== Math.floor(w * r.getPixelRatio()) || r.domElement.height !== Math.floor(h * r.getPixelRatio())) { r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+        t += dt; if (!reduced) ang += dt * 0.35;
+        cam.position.set(Math.cos(ang) * 6.3, 3.3, Math.sin(ang) * 6.3); cam.lookAt(0, 0.55, 0);
+        const k = 0.35 + 0.35 * Math.sin(t * 5); for (const m of cur.glow) m.emissiveIntensity = k;
+        for (const sd of Object.values(cur.saws)) sd.rotation.y += dt * 8;
+        r.render(s, cam);
+      },
+    };
+  })();
+
+  /* =====================================================================
+     MATCH STATE / FLOW
+     ===================================================================== */
+  const ROSTER = [
+    { id: "you", name: "YOU", color: 0x2f80ff, human: true },
+    { id: "bruiser", name: "BRUISER", color: 0xe2402c, prefer: "armor", weights: { armor: 1.4, chassis: 1.3, ram: 1.5, saw: 1.3, treads: 1.4, launcher: 0.6, emitter: 0.6 } },
+    { id: "zippy", name: "ZIPPY", color: 0x22a867, prefer: "speed", weights: { motor: 1.5, slick: 1.3, boost: 1.4, launcher: 1.4, armor: 0.6, chassis: 0.5, treads: 0.4 } },
+    { id: "sparky", name: "SPARKY", color: 0x7b3fe4, prefer: "close", weights: { emitter: 1.8, battery: 1.5, shield: 1.4, hook: 1.2, launcher: 1.1, ram: 0.7 } },
+  ];
+  let M = null, B = null;
+  const S = { phase: "intro", timer: 0, seed: 1 };
+  const cars3d = {};
+  const input = { up: false, down: false, left: false, right: false, act: false, actQueued: false };
+
+  function newMatch() {
+    const baseSeed = (Date.now() & 0xffff) + 1;
+    M = { round: 1, seed: baseSeed, cars: ROSTER.map((r, i) => ({ ...r, bp: null, credits: 0, score: 0, history: [], lock: null, tel: null, lastChange: null, reason: "", lastAlive: true, pick: null, rng: mulberry32(baseSeed * 7 + i) })), lastRoundT: ROUND_TIME, trust: $("trust").checked };
+  }
+  const me = () => M.cars[0];
+  function show(id) { for (const o of ["ovIntro", "ovGarage", "ovScore", "ovPit", "ovReveal", "ovFinal"]) $(o).hidden = o !== id; }
+  function setCenter(big, line) { $("center").innerHTML = big ? `<div class="huge">${esc(big)}</div>${line ? `<div class="line">${esc(line)}</div>` : ""}` : ""; }
+
+  /* garage */
+  const presetImgs = {};
+  function toGarage() {
+    S.phase = "garage"; S.timer = GARAGE_TIME; show("ovGarage"); $("hud").hidden = true; setCenter("");
+    clearCars(); camMode = "arena";
+    $("presets").innerHTML = Object.entries(PRESETS).map(([k, p]) => {
+      const d = derive(p.bp);
+      if (!presetImgs[k]) presetImgs[k] = snap(p.bp, null, me().color);
+      return `<button class="preset" data-k="${k}" aria-pressed="false"><img src="${presetImgs[k]}" alt="${esc(p.name)} starting car"><h3>${esc(p.name)}</h3><small>${esc(p.blurb)}</small>
+        <div class="kv"><span>HP <b>${d.hp}</b></span><span>SPEED <b>${d.top.toFixed(1)}</b></span><span>POWER <b>${d.power}/${d.slots}</b></span></div></button>`;
+    }).join("");
+    me().pick = null;
+    $("presets").querySelectorAll(".preset").forEach((b) => b.addEventListener("click", () => {
+      me().pick = b.dataset.k; $("presets").querySelectorAll(".preset").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+    }));
+    const others = Object.keys(PRESETS);
+    M.cars.slice(1).forEach((c) => { c.pick = c.rng() < 0.7 ? c.prefer : others[Math.floor(c.rng() * 3)]; });
+  }
+  function endGarage() {
+    for (const c of M.cars) {
+      if (!c.pick) c.pick = "close";
+      c.bp = clone(PRESETS[c.pick].bp);
+      if (!c.human) for (const m of MOUNTS) { const p = c.bp.mounts[m]; if (p && p.trigger === "manual") p.trigger = PARTS[p.part].triggers.find((t) => t !== "manual"); }
+      c.lastChange = `${PRESETS[c.pick].name} start`; c.reason = PRESETS[c.pick].blurb; c.prev = null;
+    }
+    toReveal(true);
+  }
+
+  /* reveal: every crew's change at once */
+  function toReveal(first) {
+    S.phase = "reveal"; S.timer = first ? 4.5 : 6; show("ovReveal"); $("hud").hidden = true; setCenter("");
+    camMode = "lineup"; clearCars();
+    M.cars.forEach((c, i) => {
+      const R = buildDiffModel(c.bp, c.prev, c.color);
+      R.group.position.set(-12 + i * 8, 0, 2); R.group.rotation.y = -Math.PI / 2;
+      for (const k of R.popKeys || []) if (R.parts[k]) R.parts[k].scale.setScalar(0.01);
+      scene.add(R.group); cars3d[c.id] = { R, label: null, lineup: true, popT: 0 };
+    });
+    $("revealTitle").textContent = first ? "STARTING CARS" : `ROUND ${M.round} · REVEAL`;
+    $("revealCards").innerHTML = M.cars.map((c, i) => `<div class="rcard" style="animation-delay:${0.15 * i + 0.3}s"><div class="nm"><i style="background:${hexStr(c.color)}"></i>${esc(c.name)}${c.human ? " (you)" : ""}<span class="muted" style="margin-left:auto">${c.score} pts</span></div>
+      <div class="chg">${esc(c.lastChange || "Kept the build")}</div><div class="why">${esc(c.reason || "")}</div></div>`).join("");
+  }
+
+  function clearCars() {
+    for (const k of Object.keys(cars3d)) { const o = cars3d[k]; scene.remove(o.R.group); disposeGroup(o.R.group); if (o.label) { scene.remove(o.label.sp); o.label.tex.dispose(); } delete cars3d[k]; }
+  }
+
+  /* countdown + battle */
+  function toCountdown() {
+    S.phase = "countdown"; S.timer = 3; show(null); camMode = "arena"; clearCars();
+    B = createBattle(M.cars.map((c) => ({ id: c.id, name: c.name, human: c.human, bp: c.bp })), M.seed * 31 + M.round);
+    for (const c of B.cars) {
+      const src = M.cars.find((x) => x.id === c.id);
+      const R = buildCar(c.bp, src.color); scene.add(R.group);
+      const label = makeLabel(); scene.add(label.sp);
+      cars3d[c.id] = { R, label, color: src.color, tilt: 0, dead: false, smokeT: 0 };
+    }
+    syncCars(0);
+    $("hud").hidden = false; $("roundPill").textContent = `ROUND ${M.round} / ${ROUNDS}`; $("timer").textContent = ROUND_TIME;
+    $("feed").innerHTML = ""; $("callout").hidden = true; buildChips(); buildMeParts(); saidFlags.st = 0; saidFlags.manual = 0;
+    setCenter("3", "GET READY");
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  function startBattle() { S.phase = "battle"; setCenter("GO!", ""); setTimeout(() => { if (S.phase === "battle") setCenter(""); }, 700); calloutAt = 0; }
+
+  function endBattle() {
+    S.phase = "roundend";
+    M.lastRoundT = B.t;
+    for (const c of B.cars) {
+      const mc = M.cars.find((x) => x.id === c.id), pts = roundPoints(c);
+      mc.tel = c.tel; mc.lastAlive = c.alive; mc.lastPts = pts; mc.score += pts.total;
+      const sal = salvageOf(c); mc.salvage = sal;
+      const h = mc.history[mc.history.length - 1]; if (h && !h.after) h.after = { dealt: c.tel.dealt, taken: c.tel.taken, pts: pts.total };
+    }
+    const alive = B.cars.filter((c) => c.alive);
+    setCenter(alive.length === 1 ? `${alive[0].name} WINS` : "TIME!", alive.length === 1 ? "LAST CAR STANDING" : `${alive.length} CARS SURVIVED`);
+    if (M.round < ROUNDS) {
+      for (const c of M.cars) c.credits += ALLOWANCE + c.salvage;
+      startCrews();
+    }
+    setTimeout(() => { if (S.phase === "roundend") toScore(); }, 1600);
+  }
+
+  function toScore() {
+    S.phase = "score"; S.timer = M.round < ROUNDS ? 5 : 4; show("ovScore"); setCenter("");
+    $("scoreH").textContent = `Round ${M.round} of ${ROUNDS} results`;
+    const rows = M.cars.slice().sort((a, b) => b.lastPts.total - a.lastPts.total);
+    $("scoreTitle").textContent = `${rows[0].name} took the round`;
+    $("scoreTbl").innerHTML = `<thead><tr><th>Car</th><th>Wrecks</th><th>Damage</th><th>Survived</th><th>Round</th><th>Total</th></tr></thead><tbody>` +
+      rows.map((c) => `<tr class="${c.human ? "you" : ""}"><td><span class="dot" style="background:${hexStr(c.color)}"></span>${esc(c.name)}</td><td>${c.tel.kos} (+${c.lastPts.ko})</td><td>${r0(c.tel.dealt)} (+${c.lastPts.dmg})</td><td>${c.lastAlive ? (c.lastPts.surv ? "yes (+2)" : "yes, passive (+0)") : "wrecked"}</td><td><b>+${c.lastPts.total}</b></td><td><b>${c.score}</b></td></tr>`).join("") + "</tbody>";
+    $("scoreNote").textContent = M.round < ROUNDS ? `Everyone gets ${ALLOWANCE} credits plus salvage (you: +${me().salvage}). Your crew is already reading the telemetry…` : "That was the last round.";
+  }
+
+  /* crews: rivals scripted, you get Claude (or the backup crew) */
+  let crewJob = null;
+  function startCrews() {
+    for (const c of M.cars.slice(1)) {
+      const C = genCandidates(c, "", c.weights), two = pickTwo(C);
+      const choice = two.length ? (c.rng() < 0.72 || two.length < 2 ? two[0] : two[1]) : null;
+      c.pending = choice;
+    }
+    const mine = me();
+    crewJob = { started: performance.now(), done: false, result: null, asks: 0 };
+    const job = crewJob;
+    crewPropose(mine, "", CREW_WAIT * 1000 + 5000).then((res) => { if (crewJob === job) { job.done = true; job.result = res; if (S.phase === "pit") renderPitCrew(); } });
+  }
+
+  function toPit() {
+    S.phase = "pit"; show("ovPit");
+    const c = me();
+    S.pit = { choice: -1, waitingSince: performance.now(), timerStarted: false, preview: -1 };
+    S.timer = PIT_TIME;
+    $("pitH").textContent = `Pit stop · after round ${M.round} of ${ROUNDS}`;
+    $("pitCredits").textContent = `${c.credits} CREDITS (+${ALLOWANCE} +${c.salvage} salvage)`;
+    $("askIn").value = ""; $("pitNote").textContent = ""; $("pitNote").className = "note";
+    $("trust").checked = !!M.trust;
+    PV.attach($("pvHost")); PV.show(c.bp, null, c.color); $("pvTag").textContent = "Current build";
+    renderStats(c.bp, null); renderLocks(); renderTelemetry(c.tel);
+    renderPitCrew();
+  }
+  function renderPitCrew() {
+    const job = crewJob, c = me();
+    const busy = !job || !job.done;
+    $("crewDot").className = busy ? "busy" : "";
+    $("crewWho").textContent = busy ? (sampleFn ? "Crew chief (Claude) · thinking" : "Backup crew · thinking") : (job.result.who === "claude" ? "Crew chief · Claude" : "Crew chief · backup crew (scripted)");
+    if (busy) { $("crewObs").textContent = "Reading the telemetry…"; $("opts").innerHTML = `<div class="skeleton"></div><div class="skeleton"></div>`; setPitButtons(false); return; }
+    const res = job.result;
+    if (!S.pit.timerStarted) { S.pit.timerStarted = true; S.timer = M.trust ? 5 : PIT_TIME; }
+    $("crewObs").textContent = res.observation;
+    $("opts").innerHTML = res.options.length ? res.options.map((o, i) => `<button class="opt" data-i="${i}" aria-pressed="false">
+        <div class="opt-h"><span class="tag">${"AB"[i]}</span><b>${esc(o.title)}</b><span class="price">${o.res.cost > 0 ? o.res.cost + " cr" : o.res.cost < 0 ? "+" + (-o.res.cost) + " cr" : "free"}</span></div>
+        <p>${esc(o.reason || o.res.label)}</p>
+        <div class="bc">${o.benefit ? `<span class="plus">+ ${esc(o.benefit)}</span>` : ""}${o.cost ? `<span class="minus">− ${esc(o.cost)}</span>` : ""}</div>
+        <div class="val">✓ VALIDATED · ${esc(o.res.label)}${o.backup ? " · from the backup crew" : ""}</div></button>`).join("")
+      : `<p class="note">No legal upgrade fits your ${c.credits} credits. Keep the build and bank the credits.</p>`;
+    $("opts").querySelectorAll(".opt").forEach((b) => {
+      const i = +b.dataset.i;
+      b.addEventListener("click", () => choose(i));
+      b.addEventListener("pointerenter", () => previewOpt(i)); b.addEventListener("focus", () => previewOpt(i));
+      b.addEventListener("pointerleave", () => previewOpt(S.pit.choice));
+    });
+    $("pitNote").textContent = res.notes.join(" "); $("pitNote").className = res.notes.length ? "note warn" : "note";
+    setPitButtons(true);
+    if (M.trust && res.options.length) { choose(0); $("pitNote").textContent = (res.notes.join(" ") + " Trust my crew is on, so option A locks in automatically.").trim(); }
+    else if (S.pit.choice >= res.options.length) S.pit.choice = -1;
+    if (S.pit.choice >= 0) choose(S.pit.choice);
+  }
+  function setPitButtons(on) { $("goBtn").disabled = !on; $("askBtn").disabled = !on || (crewJob && crewJob.asks >= 2); }
+  function previewOpt(i) {
+    const c = me(), res = crewJob && crewJob.result; if (!res) return;
+    if (S.pit.preview === i) return; S.pit.preview = i;
+    if (i < 0 || !res.options[i]) { PV.show(c.bp, null, c.color); $("pvTag").textContent = "Current build"; renderStats(c.bp, null); return; }
+    const o = res.options[i]; PV.show(o.res.bp, c.bp, c.color); $("pvTag").textContent = `Option ${"AB"[i]}: ${o.res.label}`; renderStats(o.res.bp, c.bp);
+  }
+  function choose(i) {
+    S.pit.choice = i;
+    $("opts").querySelectorAll(".opt").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.i === i ? "true" : "false"));
+    S.pit.preview = -2; previewOpt(i);
+  }
+  function renderStats(bp, prev) {
+    const d = derive(bp), p = prev ? derive(prev) : null;
+    const f = (label, v, pv, fmt, higherBetter = true) => {
+      const s = fmt(v); if (!p || Math.abs(v - pv) < 1e-6) return `<span>${label} <b>${s}</b></span>`;
+      const good = (v > pv) === higherBetter; return `<span>${label} <b class="${good ? "up" : "down"}">${s} ${v > pv ? "▲" : "▼"}</b></span>`;
+    };
+    $("pitStats").innerHTML = [
+      f("HP", d.hp, p && p.hp, (v) => v),
+      f("TOP SPEED", d.top, p && p.top, (v) => v.toFixed(1)),
+      f("WEIGHT", d.load, p && p.load, (v) => `${v.toFixed(1)}/${d.carry}`, false),
+      f("POWER", d.power, p && p.power, (v) => `${v}/${d.slots}`, false),
+      `<span>ARMOR <b>${SIDES.map((s) => bp.armor[s]).join("·")}</b></span>`,
+    ].join("");
+  }
+  function renderLocks() {
+    const c = me(), keys = Object.keys(partKeys(c.bp)).filter((k) => k !== "motor" && k !== "battery");
+    $("lockChips").innerHTML = keys.map((k) => `<button class="lchip" data-k="${k}" aria-pressed="${c.lock === k}">${c.lock === k ? "🔒 " : ""}${esc(keyName(c.bp, k))}</button>`).join("");
+    $("lockChips").querySelectorAll(".lchip").forEach((b) => b.addEventListener("click", () => {
+      c.lock = c.lock === b.dataset.k ? null : b.dataset.k; renderLocks();
+      if (crewJob && crewJob.done) {
+        const res = crewJob.result;
+        const kept = res.options.filter((o) => applyOp(c.bp, o.op, c.credits, c.lock).ok);
+        if (kept.length < res.options.length) {
+          const fill = scriptedCrew(c, "").options.filter((b2) => !kept.some((k) => k.res.label === b2.res.label));
+          res.options = [...kept, ...fill.map((x) => ({ ...x, backup: true }))].slice(0, 2);
+          res.notes = [`The lock ruled out an option, so the backup crew replaced it.`];
+          S.pit.choice = -1; S.pit.preview = -2; renderPitCrew(); previewOpt(-1);
+        }
+      }
+    }));
+  }
+  function renderTelemetry(t) {
+    if (!t) { $("teleBox").innerHTML = ""; return; }
+    const it = (k, v) => `<div><span>${k}</span> ${v}</div>`;
+    const bySide = SIDES.filter((s) => t.takenSide[s] >= 1).map((s) => `${s} ${r0(t.takenSide[s])}`).join(", ") || "none";
+    const bySrc = Object.entries(t.dealtSrc).filter(([, v]) => v >= 1).map(([k, v]) => `${k} ${r0(v)}`).join(", ") || "none";
+    $("teleBox").innerHTML = [
+      it("Dealt", `${r0(t.dealt)} (${bySrc})`), it("Taken", `${r0(t.taken)}`), it("Taken by side", bySide), it("Collisions", t.collisions),
+      it("Close / mid / far", `${r0(t.time.close)} / ${r0(t.time.mid)} / ${r0(t.time.far)} s`), it("Crowded (2+ near)", `${r0(t.crowdT)} s`),
+      it("Rockets hit", t.shots ? `${t.hits}/${t.shots}` : "—"), it("Battery stalls", t.starved), it("Energy used", r0(t.energyUsed)), it("Shield blocked", r0(t.shielded)), it("Wrecks", t.kos),
+    ].join("");
+  }
+  async function askCrew(ev) {
+    ev.preventDefault();
+    const txt = $("askIn").value.trim(); if (!txt || !crewJob || !crewJob.done || crewJob.asks >= 2) return;
+    if (S.timer < 4) { $("pitNote").textContent = "Not enough time left to re-plan, so pick an option or keep the build."; return; }
+    crewJob.asks++; crewJob.done = false; profile.asks = (profile.asks || 0) + 1;
+    const job = crewJob; S.pit.choice = -1; S.pit.preview = -2; renderPitCrew();
+    const res = await crewPropose(me(), txt, Math.max(2500, (S.timer - 2.5) * 1000));
+    if (crewJob !== job || S.phase !== "pit") return;
+    job.done = true; job.result = res; renderPitCrew(); previewOpt(-1);
+  }
+  function endPit(kind) {
+    if (S.phase !== "pit") return;
+    if (crewAbort) crewAbort.abort();
+    const c = me(), res = crewJob && crewJob.result;
+    let pickedOpt = null;
+    if (kind === "go" && res && S.pit.choice >= 0 && res.options[S.pit.choice]) pickedOpt = res.options[S.pit.choice];
+    else if (kind === "timeout" && res && S.pit.choice >= 0) pickedOpt = res.options[S.pit.choice];
+    const tag = pickedOpt ? (M.trust ? "trust" : "AB"[S.pit.choice]) : "keep";
+    profile.picks[tag] = (profile.picks[tag] || 0) + 1;
+    if (pickedOpt) { const cand = genTagOf(pickedOpt.op); profile.tags[cand] = (profile.tags[cand] || 0) + 1; }
+    commitChange(c, pickedOpt, pickedOpt ? pickedOpt.reason : (kind === "timeout" ? "No pick before the deadline, so the build stays." : "Driver kept the build."));
+    for (const r of M.cars.slice(1)) commitChange(r, r.pending, r.pending ? r.pending.reason : "Crew banked the credits.");
+    saveProfile();
+    M.round++;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    toReveal(false);
+  }
+  const genTagOf = (op) => op.op === "add" || op.op === "replace" ? op.part : op.op === "swap" ? (op.target === "wheels" ? op.to : "chassis") : op.op === "upgrade" ? (op.target === "motor" || op.target === "battery" ? op.target : "upgrade") : op.op;
+  function commitChange(car, opt, reason) {
+    car.prev = car.bp;
+    if (opt) {
+      const res = applyOp(car.bp, opt.op, car.credits, car.lock);
+      if (res.ok) { car.bp = res.bp; car.credits -= res.cost; car.lastChange = res.label; car.reason = reason || ""; car.history.push({ round: M.round, label: res.label }); return; }
+      reason = "The change failed validation at lock-in, so the previous build stands.";
+    }
+    car.lastChange = "Kept the build"; car.reason = reason || ""; car.history.push({ round: M.round, label: null });
+  }
+
+  function toFinal() {
+    S.phase = "final"; show("ovFinal"); $("hud").hidden = true; setCenter(""); camMode = "lineup"; clearCars();
+    const rows = M.cars.slice().sort((a, b) => b.score - a.score);
+    M.cars.forEach((c, i) => { const R = buildCar(c.bp, c.color); R.group.position.set(-12 + i * 8, 0, 2); R.group.rotation.y = -Math.PI / 2; scene.add(R.group); cars3d[c.id] = { R, lineup: true }; });
+    const won = rows[0].human;
+    $("finalTitle").textContent = won ? "You win the match!" : `${rows[0].name} wins the match`;
+    $("finalTbl").innerHTML = `<thead><tr><th>#</th><th>Car</th><th>Final build</th><th>Points</th></tr></thead><tbody>` +
+      rows.map((c, i) => `<tr class="${c.human ? "you" : ""}"><td>${i + 1}</td><td style="text-align:left"><span class="dot" style="background:${hexStr(c.color)}"></span>${esc(c.name)}</td><td style="text-align:left;white-space:normal;font-size:12px">${esc(buildSummary(c.bp))}</td><td><b>${c.score}</b></td></tr>`).join("") + "</tbody>";
+    const place = rows.findIndex((c) => c.human) + 1;
+    profile.matches++; if (won) profile.wins++; profile.best = Math.max(profile.best || 0, me().score); profile.places.push(place); profile.places = profile.places.slice(-20);
+    saveProfile(); renderProfile();
+    $("finalNote").textContent = `You finished #${place} with ${me().score} points. Your crew made ${me().history.filter((h) => h.label).length} changes: ${me().history.filter((h) => h.label).map((h) => h.label).join("; ") || "none"}.`;
+    $("finalProfile").textContent = profileLine();
+  }
+
+  /* =====================================================================
+     HUD
+     ===================================================================== */
+  function buildChips() {
+    $("chips").innerHTML = M.cars.map((c) => `<div class="chip${c.human ? " mine" : ""}" id="chip-${c.id}"><i style="background:${hexStr(c.color)}"></i><b>${esc(c.name)}</b><em id="chipS-${c.id}">${c.score}</em><div class="bar"><span id="chipH-${c.id}" style="width:100%"></span></div></div>`).join("");
+  }
+  function buildMeParts() {
+    const c = me();
+    $("meParts").innerHTML = MOUNTS.filter((m) => c.bp.mounts[m]).map((m) => { const p = c.bp.mounts[m]; return `<span class="pstat" id="ps-${m}">${PARTS[p.part].short}${p.trigger === "manual" ? " ␣" : ""}</span>`; }).join("") || `<span class="pstat cool">NO WEAPONS</span>`;
+  }
+  let hudAcc = 0, calloutAt = 0, calloutHide = 0;
+  function hudTick(dt) {
+    if (!B || (S.phase !== "battle" && S.phase !== "countdown")) return;
+    hudAcc += dt; if (hudAcc < 0.1) return; hudAcc = 0;
+    const tl = Math.max(0, ROUND_TIME - B.t);
+    if (S.phase === "battle") { $("timer").textContent = Math.ceil(tl); $("timer").classList.toggle("low", tl <= 10); }
+    for (const c of B.cars) {
+      const h = $("chipH-" + c.id); if (!h) continue;
+      const f = c.hp / c.d.hp; h.style.width = (f * 100).toFixed(0) + "%"; h.style.background = f > 0.5 ? "var(--good)" : f > 0.25 ? "var(--gold)" : "var(--bad)";
+      $("chip-" + c.id).classList.toggle("dead", !c.alive);
+    }
+    const mc = B.cars[0];
+    $("meHp").style.width = (mc.hp / mc.d.hp * 100).toFixed(0) + "%";
+    $("meHp").style.background = mc.hp / mc.d.hp > 0.5 ? "var(--good)" : mc.hp / mc.d.hp > 0.25 ? "var(--gold)" : "var(--bad)";
+    $("meEn").style.width = (mc.energy / mc.d.cap * 100).toFixed(0) + "%";
+    for (const m of MOUNTS) {
+      const p = mc.bp.mounts[m], el = $("ps-" + m); if (!p || !el) continue;
+      const cd = mc.cd[m] || 0, P = PARTS[p.part];
+      let cls = "pstat", txt = P.short + (p.trigger === "manual" ? " ␣" : "");
+      if (p.part === "launcher") txt += ` ${mc.ammo[m]}`;
+      if (p.part === "saw") cls += mc.sawOn[m] ? " ready" : "";
+      else if (p.part === "ram") cls += "";
+      else if (cd > 0) { cls += " cool"; txt += ` ${cd.toFixed(1)}`; }
+      else if (mc.energy < P.energy) cls += " cool";
+      else cls += p.trigger === "manual" ? " key" : " ready";
+      if (el.className !== cls) el.className = cls; if (el.textContent !== txt) el.textContent = txt;
+    }
+    if (S.phase === "battle") crewCallouts(mc);
+    if (calloutHide && performance.now() > calloutHide) { $("callout").hidden = true; calloutHide = 0; }
+  }
+  function say(txt) { const now = performance.now(); if (now < calloutAt) return; calloutAt = now + 5500; calloutHide = now + 3200; $("callout").innerHTML = `<b>CREW</b>${esc(txt)}`; $("callout").hidden = false; }
+  const saidFlags = {};
+  function crewCallouts(c) {
+    if (!c.alive) return;
+    const t = c.tel;
+    const worst = SIDES.slice().sort((a, b) => t.takenSide[b] - t.takenSide[a])[0];
+    const weak = B.cars.find((e) => e !== c && e.alive && e.hp / e.d.hp < 0.2 && Math.hypot(e.x - c.x, e.z - c.z) < 14);
+    if (weak) return say(`${weak.name} is almost wrecked. Finish it!`);
+    if (recentDmg(c) > 14) return say(`${cap(worst)} side is taking a beating. Turn your nose in.`);
+    if (t.starved > (saidFlags.st || 0)) { saidFlags.st = t.starved; return say("Battery's empty, so the weapons are stalling."); }
+    const manual = MOUNTS.find((m) => c.bp.mounts[m] && c.bp.mounts[m].trigger === "manual" && !(c.cd[m] > 0) && c.energy >= PARTS[c.bp.mounts[m].part].energy);
+    if (manual && B.t > 4 && !saidFlags.manual) { saidFlags.manual = 1; return say(`SPACE fires your ${PARTS[c.bp.mounts[manual].part].name.toLowerCase()}.`); }
+    const n = nearestEnemy(B, c); if (n && n.d > 14 && B.t > 12 && Math.hypot(c.vx, c.vz) < 3) return say(`${n.e.name} is ${r0(n.d)} m away. Go get points!`);
+  }
+  function kf(html) { const d = document.createElement("div"); d.className = "kf"; d.innerHTML = html; $("feed").prepend(d); while ($("feed").children.length > 4) $("feed").lastChild.remove(); setTimeout(() => d.remove(), 6000); }
+
+  /* =====================================================================
+     SYNC 3D WITH SIM + FX
+     ===================================================================== */
+  const SRC_COL = { ram: 0xffb703, saw: 0xfff2a8, rocket: 0xff7a1a, zap: 0x5fe0ff, hook: 0xffffff, bump: 0xfff3e6 };
+  function handleEvents() {
+    for (const e of B.events) {
+      switch (e.type) {
+        case "hit": {
+          const big = e.amt > 8;
+          burst(e.x + (e.fx - e.x) * 0.45, 0.8, e.z + (e.fz - e.z) * 0.45, big ? 16 : 5, SRC_COL[e.src] || 0xffffff, big ? 8 : 5, big ? 5 : 3, 0.5);
+          if (e.id === "you" && e.amt > 5) shake = Math.min(0.6, shake + e.amt / 40);
+          break;
+        }
+        case "bump": burst(e.x, 0.3, e.z, Math.round(4 + e.k * 6), 0xfff3e6, 3, 1.5, 0.5, 0.3); break;
+        case "pulse": ring(e.x, e.z, e.r); burst(e.x, 1, e.z, 18, 0x5fe0ff, 9, 2, 0.4, 0.2); break;
+        case "pop": burst(e.x, 0.8, e.z, e.big ? 14 : 6, 0xff7a1a, e.big ? 7 : 4, 3, 0.45); break;
+        case "shot": { const c = B.cars.find((x) => x.id === e.id), p = mountPoint(c, e.m); burst(p.x, 1.1, p.z, 4, 0xffe28a, 3, 2, 0.25); break; }
+        case "boost": break;
+        case "hook": { const H = hookLines.find((h) => h.t <= 0) || hookLines[0]; H.t = 0.35; H.a = e.id; H.b = e.to; H.l.visible = true; break; }
+        case "ko": {
+          burst(e.x, 1, e.z, 50, 0xff5a36, 10, 7, 0.9); burst(e.x, 1, e.z, 24, 0x2b2521, 5, 6, 1.2, 0.5);
+          const v = B.cars.find((c) => c.id === e.id), by = e.by ? B.cars.find((c) => c.id === e.by) : null;
+          kf(by ? `${esc(by.name)} wrecked ${esc(v.name)}` : `${esc(v.name)} is out`);
+          if (e.id === "you") { shake = 0.8; say("You're wrecked. You still keep this round's points."); }
+          if (e.by === "you") say(`Wreck on ${v.name}! +3 points.`);
+          break;
+        }
+      }
+    }
+    B.events.length = 0;
+  }
+  function syncCars(dt) {
+    if (!B || S.phase === "reveal" || S.phase === "final" || S.phase === "garage") return;
+    for (const c of B.cars) {
+      const o = cars3d[c.id]; if (!o) continue;
+      const g = o.R.group; g.position.set(c.x, 0, c.z); g.rotation.y = c.h;
+      const vf = c.vx * Math.cos(c.h) - c.vz * Math.sin(c.h);
+      for (const w of o.R.wheels) w.rotation.y -= vf * dt / 0.4;
+      for (const m in o.R.saws) if (c.sawOn[m] || S.phase === "battle") o.R.saws[m].rotation.y += dt * (c.sawOn[m] ? 30 : 8);
+      for (const fl of o.R.flames) { fl.visible = c.boostT > 0; if (fl.visible) fl.scale.set(1, 0.8 + Math.random() * 0.5, 1); }
+      if (o.R.bubble) o.R.bubble.visible = c.shieldT > 0;
+      for (const orb of o.R.orbs) orb.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(performance.now() / 150) + (c.cd.top > PARTS.emitter.cd - 0.3 ? 2 : 0);
+      for (const m in o.R.turrets) {
+        const p = c.bp.mounts[m], t = p ? targetFor(B, c, m, p) || (nearestEnemy(B, c) || {}).e : null;
+        if (t) { const { lx, lz } = toLocal(c, t.x, t.z); const want = Math.atan2(-lz, lx), tr = o.R.turrets[m]; tr.rotation.y += wrapA(want - tr.rotation.y) * Math.min(1, dt * 8); }
+      }
+      if (!c.alive) {
+        if (!o.dead) { o.dead = true; o.R.bodyMat.color.copy(lin(0x4a3a30)); }
+        o.tilt = Math.min(1, o.tilt + dt * 3); g.rotation.z = o.tilt * 0.5; g.position.y = -o.tilt * 0.15;
+        o.smokeT -= dt; if (o.smokeT <= 0) { o.smokeT = 0.18; burst(c.x, 1.2, c.z, 1, 0x5a4a40, 0.6, 2.2, 1.4, -0.05); }
+      } else if (c.hp / c.d.hp < 0.35) {
+        o.smokeT -= dt; if (o.smokeT <= 0) { o.smokeT = 0.25; burst(c.x, 1.1, c.z, 1, 0x8a7a70, 0.5, 2, 1, -0.05); }
+      }
+      if (o.label) { o.label.sp.position.set(c.x, o.R.topY + 1.6, c.z); drawLabel(o.label, c.name, o.color, c.alive ? c.hp / c.d.hp : 0, c.human); }
+      if (c.boostT > 0 && Math.random() < 0.5) { const b = toWorld(c, -c.d.r - 0.8, 0); burst(b.x, 0.7, b.z, 1, 0xffb703, 1.5, 1, 0.3, 0.1); }
+    }
+    shotMeshes.forEach((m, i) => { const s = B.shots[i]; m.visible = !!s; if (s) m.position.set(s.x, 1.1, s.z); });
+    for (const H of hookLines) {
+      if (H.t <= 0) { H.l.visible = false; continue; }
+      H.t -= dt; const a = B.cars.find((c) => c.id === H.a), b = B.cars.find((c) => c.id === H.b);
+      const pos = H.l.geometry.attributes.position; pos.setXYZ(0, a.x, 1, a.z); pos.setXYZ(1, b.x, 0.8, b.z); pos.needsUpdate = true;
+    }
+  }
+  function lineupTick(dt) {
+    for (const id in cars3d) {
+      const o = cars3d[id]; if (!o.lineup) continue;
+      o.popT = (o.popT || 0) + dt;
+      const R = o.R;
+      for (const k of R.popKeys || []) { const g = R.parts[k]; if (!g) continue; const t = clamp((o.popT - 0.6) / 0.5, 0, 1); const s = t < 1 ? Math.max(0.01, 1 + Math.sin(t * Math.PI) * 0.35 - (1 - t) * 1) : 1; g.scale.setScalar(Math.max(0.01, t < 1 ? s * t + (1 - t) * 0.01 : 1));
+        if (t > 0 && !g.userData.popped) { g.userData.popped = true; const wp = new THREE.Vector3(); g.getWorldPosition(wp); burst(wp.x, wp.y + 0.3, wp.z, 18, 0xffb703, 4, 4, 0.7); } }
+      if (R.glow) { const k = 0.3 + 0.3 * Math.sin(performance.now() / 160); for (const m of R.glow) m.emissiveIntensity = k; }
+      for (const sd of Object.values(R.saws)) sd.rotation.y += dt * 6;
+    }
+  }
+
+  /* =====================================================================
+     INPUT
+     ===================================================================== */
+  const KEYMAP = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right", Space: "act" };
+  const typing = (t) => t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+  addEventListener("keydown", (e) => {
+    const k = KEYMAP[e.code]; if (!k || typing(e.target)) return;
+    if (S.phase === "battle" || S.phase === "countdown") e.preventDefault(); else if (k === "act") return;
+    if (k === "act") { if (!e.repeat) input.actQueued = true; } else input[k] = true;
+  });
+  addEventListener("keyup", (e) => { const k = KEYMAP[e.code]; if (k && k !== "act") input[k] = false; });
+  addEventListener("blur", () => { input.up = input.down = input.left = input.right = false; });
+  const coarse = matchMedia("(pointer: coarse)").matches;
+  if (coarse) { $("touch").hidden = false; stage.classList.add("touching"); }
+  $("touch").querySelectorAll(".tb").forEach((b) => {
+    const k = b.dataset.k;
+    const on = (e) => { e.preventDefault(); if (k === "act") input.actQueued = true; else input[k] = true; b.classList.add("on"); };
+    const off = () => { if (k !== "act") input[k] = false; b.classList.remove("on"); };
+    b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("pointerleave", off);
+  });
+  function readInput() {
+    const act = input.actQueued; input.actQueued = false;
+    return { thr: (input.up ? 1 : 0) - (input.down ? 1 : 0), steer: (input.left ? 1 : 0) - (input.right ? 1 : 0), action: act };
+  }
+
+  /* =====================================================================
+     MAIN LOOP
+     ===================================================================== */
+  const STEP = 1 / 60;
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    phaseTick(dt);
+    if (S.phase === "battle" && B && !B.over) {
+      acc += dt; let stepped = false;
+      while (acc >= STEP) { const inp = readInput(); stepBattle(B, STEP, inp); acc -= STEP; stepped = true; if (B.over) break; }
+      if (stepped) handleEvents();
+      if (B.over) endBattle();
+    } else acc = 0;
+    syncCars(dt); lineupTick(dt); stepParticles(dt);
+    for (const R of rings) { if (R.t >= 1) { R.m.visible = false; continue; } R.t = Math.min(1, R.t + dt / 0.4); const s = 0.5 + R.t * R.r; R.m.scale.set(s, s, 1); R.m.material.opacity = 0.8 * (1 - R.t); }
+    hudTick(dt);
+    const pose = camPose[camMode], k = Math.min(1, dt * 3);
+    camNow.pos.lerp(pose.pos, k); camNow.look.lerp(pose.look, k);
+    camera.position.copy(camNow.pos);
+    if (shake > 0 && !reduced) { camera.position.x += (Math.random() - 0.5) * shake; camera.position.y += (Math.random() - 0.5) * shake; shake = Math.max(0, shake - dt * 2); }
+    camera.lookAt(camNow.look);
+    renderer.render(scene, camera);
+    if (S.phase === "pit") PV.tick(dt);
+  }
+  function phaseTick(dt) {
+    switch (S.phase) {
+      case "garage": S.timer -= dt; $("garageCount").textContent = Math.max(0, Math.ceil(S.timer)); $("garageCount").classList.toggle("low", S.timer < 5); if (S.timer <= 0) endGarage(); break;
+      case "reveal": S.timer -= dt; if (S.timer <= 0) toCountdown(); break;
+      case "countdown": { const prev = Math.ceil(S.timer); S.timer -= dt; const n = Math.ceil(S.timer); if (n !== prev && n > 0) setCenter(String(n), "GET READY"); if (S.timer <= 0) startBattle(); break; }
+      case "score": S.timer -= dt; $("scoreCount").textContent = Math.max(0, Math.ceil(S.timer)); if (S.timer <= 0) { if (M.round >= ROUNDS) toFinal(); else toPit(); } break;
+      case "pit": {
+        if (!S.pit.timerStarted) {
+          const waited = (performance.now() - crewJob.started) / 1000;
+          $("pitCount").textContent = "…";
+          if (waited > CREW_WAIT + 6 && crewAbort) crewAbort.abort();
+          break;
+        }
+        S.timer -= dt; $("pitCount").textContent = Math.max(0, Math.ceil(S.timer)); $("pitCount").classList.toggle("low", S.timer < 5);
+        if (S.timer <= 0) endPit(M.trust ? "go" : "timeout");
+        break;
+      }
+    }
+  }
+
+  /* =====================================================================
+     PROFILE (per-browser convenience)
+     ===================================================================== */
+  let profile = { matches: 0, wins: 0, best: 0, places: [], picks: {}, tags: {}, asks: 0 };
+  try { const raw = localStorage.getItem("pca-profile-v1"); if (raw) profile = Object.assign(profile, JSON.parse(raw)); } catch (e) {}
+  function saveProfile() { try { localStorage.setItem("pca-profile-v1", JSON.stringify(profile)); } catch (e) {} }
+  function profileSummary() {
+    const tags = Object.entries(profile.tags).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k}×${v}`).join(", ");
+    const picks = Object.entries(profile.picks).map(([k, v]) => `${k === "keep" ? "kept build" : k === "trust" ? "trusted crew" : "option " + k}×${v}`).join(", ");
+    return profile.matches || tags ? `${profile.matches} matches, ${profile.wins} wins. Usually picks: ${tags || "nothing yet"}. Pit choices: ${picks || "none"}. Instructions given: ${profile.asks || 0}.` : "new driver, no history";
+  }
+  function profileLine() { return profile.matches ? `${profile.matches} matches · ${profile.wins} wins · best ${profile.best} pts` : "First match. Good luck."; }
+  function renderProfile() {
+    const avg = profile.places.length ? (profile.places.reduce((a, b) => a + b, 0) / profile.places.length).toFixed(1) : "—";
+    const tags = Object.entries(profile.tags).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ×${v}`).join(", ") || "—";
+    const picks = ["A", "B", "keep", "trust"].map((k) => `${k === "keep" ? "kept" : k === "trust" ? "trusted" : k} ×${profile.picks[k] || 0}`).join(", ");
+    $("profileBox").innerHTML = `<span>MATCHES <b>${profile.matches}</b></span><span>WINS <b>${profile.wins}</b></span><span>BEST <b>${profile.best || 0}</b></span><span>AVG PLACE <b>${avg}</b></span><span>PIT PICKS <b>${picks}</b></span><span>FAVOURITES <b>${esc(tags)}</b></span>`;
+    $("profileLine").textContent = profileLine();
+  }
+
+  /* =====================================================================
+     BALANCE CHECK — seeded AI-only fights, same sim
+     ===================================================================== */
+  function runBalance(n) {
+    const keys = Object.keys(PRESETS), stats = {}, src = {};
+    keys.forEach((k) => (stats[k] = { n: 0, pts: 0, wins: 0, surv: 0 }));
+    for (let s = 1; s <= n; s++) {
+      const rng = mulberry32(s * 97);
+      const picks = [0, 1, 2, 3].map((i) => (i < 3 ? keys[(s + i) % 3] : keys[Math.floor(rng() * 3)]));
+      const entries = picks.map((k, i) => { const bp = clone(PRESETS[k].bp); for (const m of MOUNTS) { const p = bp.mounts[m]; if (p && p.trigger === "manual") p.trigger = PARTS[p.part].triggers.find((t) => t !== "manual"); } return { id: "c" + i, name: k, bp }; });
+      const b = createBattle(entries, s);
+      while (!b.over) { stepBattle(b, 1 / 30, null); b.events.length = 0; }
+      const pts = b.cars.map((c) => roundPoints(c).total), top = Math.max(...pts);
+      b.cars.forEach((c, i) => { const st = stats[picks[i]]; st.n++; st.pts += pts[i]; if (pts[i] === top) st.wins++; if (c.alive) st.surv++; for (const k in c.tel.dealtSrc) src[k] = (src[k] || 0) + c.tel.dealtSrc[k]; });
+    }
+    const tot = Object.values(src).reduce((a, b) => a + b, 0) || 1;
+    return { stats, src, tot };
+  }
+  $("balBtn").addEventListener("click", () => {
+    $("balNote").textContent = "Running…"; $("balBtn").disabled = true;
+    setTimeout(() => {
+      const t0 = performance.now(), { stats, src, tot } = runBalance(60), ms = performance.now() - t0;
+      $("balOut").innerHTML = `<table><thead><tr><th>Start</th><th>Fights</th><th>Avg pts</th><th>Top score</th><th>Survived</th></tr></thead><tbody>${Object.entries(stats).map(([k, s]) =>
+        `<tr><td>${PRESETS[k].name}</td><td>${s.n}</td><td>${(s.pts / s.n).toFixed(2)}</td><td>${pct(s.wins / s.n)}</td><td>${pct(s.surv / s.n)}</td></tr>`).join("")}</tbody></table>
+        <p class="note" style="margin-top:8px">Damage share: ${Object.entries(src).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${pct(v / tot)}`).join(" · ")}</p>`;
+      $("balNote").textContent = `60 fights (seeds 1–60) in ${r0(ms)} ms`; $("balBtn").disabled = false;
+    }, 30);
+  });
+
+  /* catalog table */
+  (function renderCatalog() {
+    const rows = [
+      ["Chassis", "—", "core", "—", "—", "light 85 hp, carries 9 · standard 115 hp, 11 · heavy 150 hp, 13. Swapping costs 1 + the price difference."],
+      ["Wheels", "2", "core", "—", "—", "slick: fast, slides · off-road: balanced · treads: grip, hard to push, slow."],
+      ["Motor", `${CORE_UPGRADE}/lvl`, "core", "—", "—", "Mk 1–3: more thrust and top speed."],
+      ["Battery", `${CORE_UPGRADE}/lvl`, "core", "—", "—", "Mk 1–3: 4/6/8 power slots, 24/34/44 energy, faster recharge."],
+      ["Armor", `${ARMOR_COST}/lvl`, "front · left · right · rear · top", "—", "—", "Levels 0–2. Each level cuts damage from that side by 20%. Zap pulses hit the top."],
+      ...Object.values(PARTS).map((P) => [P.name, P.cost + ` (Mk2 +${upCost(P)})`, P.mounts.join(" · "), P.power, P.triggers.map((t) => TRIG[t].short).join(", "), P.desc]),
+    ];
+    $("catalog").innerHTML = `<table><thead><tr><th>Part</th><th>Credits</th><th>Mounts</th><th>Power</th><th>Triggers</th><th>What it does</th></tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  })();
+
+  /* =====================================================================
+     WIRING
+     ===================================================================== */
+  function updateCrewMode() { $("crewMode").textContent = sampleFn ? "Crew chief: Claude (fast model), with a scripted backup if it misses the deadline." : "Crew chief: scripted backup crew (Claude isn't available on this view)."; }
+  $("startBtn").addEventListener("click", () => { newMatch(); toGarage(); });
+  $("againBtn").addEventListener("click", () => { newMatch(); toGarage(); });
+  $("garageGo").addEventListener("click", () => { if (S.phase === "garage") endGarage(); });
+  $("goBtn").addEventListener("click", () => endPit(S.pit && S.pit.choice >= 0 ? "go" : "keep"));
+  $("keepBtn").addEventListener("click", () => { if (S.pit) S.pit.choice = -1; endPit("keep"); });
+  $("askForm").addEventListener("submit", askCrew);
+  $("trust").addEventListener("change", () => { if (M) M.trust = $("trust").checked; if (S.phase === "pit" && M.trust && crewJob && crewJob.done && crewJob.result.options.length) { choose(0); S.timer = Math.min(S.timer, 5); } });
+  new ResizeObserver(fitCam).observe(stage);
+  fitCam(); camNow.pos.copy(camPose.arena.pos); camNow.look.copy(camPose.arena.look);
+  renderProfile(); updateCrewMode();
+  requestAnimationFrame(frame);
+  (async () => { try { sampleFn = window.claude && window.claude.use ? await window.claude.use("sample") : null; } catch (e) { sampleFn = null; } updateCrewMode(); })();
+
+  /* test hooks (headless checks) */
+  window.__pca = { get S() { return S; }, get M() { return M; }, get B() { return B; }, applyOp, validateBlueprint, derive, runBalance, genCandidates, crewPrompt, checkOptions, PRESETS, endGarage: () => endGarage(), setSample: (f) => { sampleFn = f; updateCrewMode(); } };
+})();
+</script>
+</body>
+</html>
