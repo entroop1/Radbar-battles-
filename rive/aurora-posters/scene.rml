@@ -1,0 +1,53 @@
+<Rive version="1" kind="fragment">
+    <!-- Scripts and shaders are bundled by extension; the drawable references its script by id. -->
+    <ScriptAsset file="AuroraPoster.luau" name="AuroraPoster" id="0:10"/>
+
+    <Artboard defaultStateMachineId="0:3" width="1280" height="720" name="Posters" id="0:2">
+        <Fill name="Background">
+            <SolidColor colorValue="FFECEBF0" name="Color"/>
+        </Fill>
+
+        <!-- Three posters, one WGSL shader: 0 pastel field, 1 light, 2 night. -->
+        <ScriptedDrawable name="Cosmic wind drop" x="90" y="122" scriptAssetId="0:10" id="0:20">
+            <ScriptInputNumber name="width" propertyValue="336"/>
+            <ScriptInputNumber name="height" propertyValue="476"/>
+            <ScriptInputNumber name="mode" propertyValue="0"/>
+            <ScriptInputNumber name="seed" propertyValue="3.1"/>
+            <ScriptInputNumber name="speed" propertyValue="1"/>
+            <ScriptInputNumber name="reach" propertyValue="1"/>
+            <ScriptInputNumber name="resolution" propertyValue="0.75"/>
+        </ScriptedDrawable>
+        <ScriptedDrawable name="From the land" x="472" y="122" scriptAssetId="0:10" id="0:21">
+            <ScriptInputNumber name="width" propertyValue="336"/>
+            <ScriptInputNumber name="height" propertyValue="476"/>
+            <ScriptInputNumber name="mode" propertyValue="1"/>
+            <ScriptInputNumber name="seed" propertyValue="7.4"/>
+            <ScriptInputNumber name="speed" propertyValue="1"/>
+            <ScriptInputNumber name="reach" propertyValue="1"/>
+            <ScriptInputNumber name="resolution" propertyValue="0.75"/>
+        </ScriptedDrawable>
+        <ScriptedDrawable name="Night emission" x="854" y="122" scriptAssetId="0:10" id="0:22">
+            <ScriptInputNumber name="width" propertyValue="336"/>
+            <ScriptInputNumber name="height" propertyValue="476"/>
+            <ScriptInputNumber name="mode" propertyValue="2"/>
+            <ScriptInputNumber name="seed" propertyValue="1.9"/>
+            <ScriptInputNumber name="speed" propertyValue="1"/>
+            <ScriptInputNumber name="reach" propertyValue="1"/>
+            <ScriptInputNumber name="resolution" propertyValue="0.75"/>
+        </ScriptedDrawable>
+
+        <!-- Plays on load so the scripted drawables keep advancing. -->
+        <StateMachine name="State Machine 1" id="0:3">
+            <StateMachineLayer name="Layer 1" id="0:4">
+                <AnyState x="200" y="-120"/>
+                <ExitState x="400" y="-120"/>
+                <EntryState>
+                    <StateTransition stateToId="0:6"/>
+                </EntryState>
+                <AnimationState x="200" animationId="0:5" id="0:6"/>
+            </StateMachineLayer>
+        </StateMachine>
+
+        <LinearAnimation loopValue="loop" duration="600" name="Idle" id="0:5"/>
+    </Artboard>
+</Rive>
