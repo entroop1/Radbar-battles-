@@ -1086,6 +1086,7 @@ Reply with JSON only:
   try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
   catch (e) { stage.insertAdjacentHTML("beforeend", '<div class="nogl">This page needs WebGL, which is turned off in your browser.</div>'); return; }
   const lin = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+  const pillarMeshes = [];
   const GROUND = 0xf3a462;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1146,7 +1147,7 @@ Reply with JSON only:
       const g = new THREE.Group(); g.position.set(P.x, 0, P.z);
       for (let k = 0; k < 4; k++) { const c = mesh(new THREE.CylinderGeometry(P.r, P.r, 0.5, 28), mat(k % 2 ? 0xffffff : 0xe2402c, { r: 0.45 })); c.position.y = 0.25 + k * 0.5; g.add(c); }
       const cap2 = mesh(new THREE.SphereGeometry(P.r * 0.6, 20, 12), mat(0xffb703)); cap2.position.y = 2.2; g.add(cap2);
-      scene.add(g);
+      scene.add(g); pillarMeshes.push(g);
     }
     const rng = mulberry32(7);
     for (let i = 0; i < 46; i++) {
@@ -1557,10 +1558,14 @@ Reply with JSON only:
   /* crews: rivals scripted, you get Claude (or the backup crew) */
   let crewJob = null;
   function startCrews() {
+    const taken = {};
     for (const c of M.cars.slice(1)) {
-      const C = genCandidates(c, "", c.weights), two = pickTwo(C);
+      const C = genCandidates(c, "", c.weights);
+      for (const x of C) if (taken[x.tag]) x.score *= 0.2;
+      C.sort((a, b) => b.score - a.score);
+      const two = pickTwo(C);
       const choice = two.length ? (c.rng() < 0.72 || two.length < 2 ? two[0] : two[1]) : null;
-      c.pending = choice;
+      c.pending = choice; if (choice) taken[choice.tag] = 1;
     }
     const mine = me();
     crewJob = { started: performance.now(), done: false, result: null, asks: 0 };
@@ -1889,6 +1894,7 @@ Reply with JSON only:
     syncCars(dt); lineupTick(dt); stepParticles(dt);
     for (const R of rings) { if (R.t >= 1) { R.m.visible = false; continue; } R.t = Math.min(1, R.t + dt / 0.4); const s = 0.5 + R.t * R.r; R.m.scale.set(s, s, 1); R.m.material.opacity = 0.8 * (1 - R.t); }
     hudTick(dt);
+    for (const g of pillarMeshes) g.visible = camMode !== "lineup";
     const pose = camPose[camMode], k = Math.min(1, dt * 3);
     camNow.pos.lerp(pose.pos, k); camNow.look.lerp(pose.look, k);
     camera.position.copy(camNow.pos);
