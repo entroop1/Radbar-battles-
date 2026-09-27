@@ -1,5 +1,9 @@
-name: aurora-posters
+name: aurora-cli
 main: Posters
+
+exclude:
+  - web-prototype
+  - README.md
 
 logs:
   file: build/rive.log
