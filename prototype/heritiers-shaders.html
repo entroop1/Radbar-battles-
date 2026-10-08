@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Les Héritiers — Shader Gallery</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d12;
+    --panel: #12151d;
+    --panel-2: #181c27;
+    --line: rgba(240, 232, 214, 0.12);
+    --ink: #f1ebdc;
+    --ink-soft: #9a97a0;
+    --blue: #2f4bff;
+    --red: #ee2a3a;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--serif); line-height: 1.45; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 10px 24px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-weight: 400; font-size: clamp(28px, 5vw, 48px); letter-spacing: -0.01em; line-height: 1; }
+  h1 em { color: var(--red); font-style: italic; }
+  .tag { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); max-width: 52ch; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0 8px; }
+  .chip, .btn { font: 600 13px var(--mono); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; cursor: pointer; }
+  .chip:hover, .btn:hover { border-color: rgba(240,232,214,.4); }
+  .chip[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); }
+  .btn.red { background: var(--red); border-color: var(--red); }
+  .who { margin: 6px 0 18px; font-size: 15px; color: var(--ink-soft); }
+  .who b { color: var(--ink); font-weight: 400; font-size: 19px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+  .card canvas { display: block; width: 100%; aspect-ratio: 4 / 5; background: #000; cursor: zoom-in; }
+  .meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 5px; }
+  .meta h3 { margin: 0; font-weight: 400; font-size: 18px; }
+  .meta p { margin: 0; font: 11.5px/1.4 var(--mono); color: var(--ink-soft); }
+  .meta label { display: flex; gap: 8px; align-items: center; font: 11px var(--mono); color: var(--ink-soft); }
+  input[type=range] { flex: 1; accent-color: var(--red); min-width: 0; }
+  .fail { padding: 30px 12px; font: 12px var(--mono); color: #ff8a8a; }
+  #modal { position: fixed; inset: 0; background: rgba(5,6,9,.94); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .m-in { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; justify-content: center; max-width: 1100px; width: 100%; }
+  #mcanvas { max-height: 86vh; aspect-ratio: 4 / 5; height: min(86vh, 130vw); border: 1px solid var(--line); border-radius: 8px; background: #000; }
+  .m-side { flex: 1; min-width: 260px; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+  .m-side h2 { margin: 0; font-weight: 400; font-size: 30px; }
+  .m-side pre { margin: 0; max-height: 40vh; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 11px/1.45 var(--mono); color: #cfd6ff; white-space: pre; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  details { margin-top: 28px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+  summary { cursor: pointer; font-size: 17px; }
+  details pre { overflow: auto; font: 12px/1.5 var(--mono); color: #cfd6ff; }
+  footer { margin-top: 24px; font: 11.5px var(--mono); color: var(--ink-soft); }
+  #drop { outline: 2px dashed var(--red); outline-offset: -6px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <h1>Les <em>Héritiers</em> — shader gallery</h1>
+    <div class="tag">14 real-time post-processing looks for the daily-portrait homepage. Demoscene spirit: small shaders, hard constraints, no libraries. Pick a héritier, click any tile to go big, copy the GLSL.</div>
+  </header>
+
+  <div class="bar" id="people"></div>
+  <div class="who" id="who"></div>
+  <div class="bar">
+    <button class="btn red" id="upload">Use your own portrait…</button>
+    <input type="file" id="file" accept="image/*" hidden>
+    <button class="btn" id="pause">Pause time</button>
+    <span class="tag">…or drop an image anywhere on the page.</span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <details>
+    <summary>Integrating a shader into the homepage</summary>
+<pre>// 1. Copy a shader with "Copy GLSL" (it includes the shared prelude).
+// 2. Draw the day's portrait into any canvas/img, then:
+const gl = canvas.getContext("webgl");
+const prog = link(gl, VERT, fragmentSourceFromGallery);
+// uniforms: uTex (portrait), uRes (px), uTime (s), uP (0..1 intensity)
+function frame(t) {
+  gl.uniform1f(uTime, t / 1000);
+  gl.uniform1f(uP, 0.5);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(frame);
+}
+// Tip: pick shader = dayIndex % 14, so each of the 180 days has a different "decrunch".</pre>
+  </details>
+  <footer>Portraits here are procedurally drawn stand-ins (no photos in the repo). Drop real ones in to judge the looks properly.</footer>
+</div>
+
+<div id="modal" hidden>
+  <div class="m-in">
+    <canvas id="mcanvas"></canvas>
+    <div class="m-side">
+      <h2 id="mname"></h2>
+      <p class="tag" id="mdesc"></p>
+      <label class="tag" style="display:flex;gap:8px;align-items:center"><span id="mplabel"></span><input type="range" id="mp" min="0" max="1" step="0.01"></label>
+      <div class="row">
+        <button class="btn" id="mprev">← prev</button>
+        <button class="btn" id="mnext">next →</button>
+        <button class="btn red" id="mcopy">Copy GLSL</button>
+        <button class="btn" id="mclose">Close (Esc)</button>
+      </div>
+      <pre id="msrc"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- the héritiers (procedural stand-in portraits) ---------- */
+const PEOPLE = [
+  { name: "Joseph Marie Jacquard", years: "1752–1834", blurb: "Invented the programmable punch-card loom.", skin: "#d8b698", hair: "wig", coat: "#3a4a7a", cravat: true },
+  { name: "Sophie Germain", years: "1776–1831", blurb: "Foundational work on elasticity theory; wrote as “Monsieur Le Blanc”.", skin: "#e0c3a8", hair: "bun", hairCol: "#2a1f1a", coat: "#7a2f3a", lace: true, female: true },
+  { name: "Émile Baudot", years: "1845–1903", blurb: "Invented the 5-bit Baudot code, ancestor of ASCII.", skin: "#d2ae90", hair: "short", hairCol: "#3a2c24", stache: true, coat: "#242a3a", cravat: true },
+  { name: "Marcel Boiteux", years: "1922–2023", blurb: "Architect of France's nuclear programme.", skin: "#dbb99c", hair: "bald", hairCol: "#d8d6d0", glasses: true, coat: "#2c3342", cravat: true },
+  { name: "Jean-Louis Gassée", years: "b. 1944", blurb: "Apple, Be Inc.", skin: "#dcbb9f", hair: "short", hairCol: "#cfcdc8", glasses: true, coat: "#1d1f26" },
+  { name: "Jean-Baptiste Kempf", years: "b. 1983", blurb: "VLC media player.", skin: "#d9b497", hair: "long", hairCol: "#2b2019", beard: true, coat: "#3a3f4a" },
+];
+
+const SRC_W = 640, SRC_H = 800;
+const srcCanvas = document.createElement("canvas");
+srcCanvas.width = SRC_W; srcCanvas.height = SRC_H;
+const sctx = srcCanvas.getContext("2d");
+
+function ell(c, x, y, rx, ry, fill) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fillStyle = fill; c.fill(); }
+
+function drawPortrait(p) {
+  const c = sctx, W = SRC_W, H = SRC_H, cx = W / 2;
+  let g = c.createRadialGradient(cx, 330, 40, cx, 380, 560);
+  g.addColorStop(0, "#8b8f9c"); g.addColorStop(1, "#171922");
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+
+  // shoulders
+  g = c.createLinearGradient(0, 600, 0, H);
+  g.addColorStop(0, p.coat); g.addColorStop(1, "#0c0d12");
+  c.beginPath(); c.ellipse(cx, 840, 330, 250, 0, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+  // neck
+  ell(c, cx, 585, 56, 90, shade(p.skin, -0.18));
+  if (p.cravat) { c.beginPath(); c.moveTo(cx - 70, 600); c.lineTo(cx + 70, 600); c.lineTo(cx + 40, 740); c.lineTo(cx - 40, 740); c.closePath(); c.fillStyle = "#e9e5da"; c.fill(); }
+  if (p.lace) { for (let i = 0; i < 14; i++) ell(c, cx - 78 + i * 12, 620 + Math.abs(i - 6.5) * 4, 11, 11, "#ece6da"); }
+
+  // back hair
+  const hc = p.hairCol || "#e7e5df";
+  if (p.hair === "wig") { ell(c, cx, 390, 158, 190, hc); ell(c, 180, 480, 42, 52, hc); ell(c, 460, 480, 42, 52, hc); ell(c, 160, 560, 34, 40, hc); ell(c, 480, 560, 34, 40, hc); }
+  if (p.hair === "bun") { ell(c, cx, 410, 140, 180, hc); ell(c, cx, 190, 58, 52, hc); }
+  if (p.hair === "long") { ell(c, cx, 480, 150, 245, hc); }
+
+  // ears + head
+  ell(c, cx - 118, 420, 18, 34, shade(p.skin, -0.1)); ell(c, cx + 118, 420, 18, 34, shade(p.skin, -0.1));
+  g = c.createRadialGradient(cx - 50, 340, 20, cx, 410, 190);
+  g.addColorStop(0, shade(p.skin, 0.12)); g.addColorStop(0.7, p.skin); g.addColorStop(1, shade(p.skin, -0.32));
+  c.beginPath(); c.ellipse(cx, 410, 120, 158, 0, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+
+  // hair on top
+  if (p.hair === "wig") { ell(c, cx, 262, 126, 58, hc); ell(c, cx - 96, 330, 28, 60, hc); ell(c, cx + 96, 330, 28, 60, hc); }
+  if (p.hair === "bun") { c.beginPath(); c.ellipse(cx, 280, 124, 78, 0, Math.PI, 0); c.fillStyle = hc; c.fill(); ell(c, cx - 70, 320, 30, 55, hc); ell(c, cx + 70, 320, 30, 55, hc); }
+  if (p.hair === "short" || p.hair === "long") { c.beginPath(); c.ellipse(cx, 300, 124, 82, 0, Math.PI, 0); c.fillStyle = hc; c.fill(); }
+  if (p.hair === "bald") { ell(c, cx - 122, 400, 12, 46, hc); ell(c, cx + 122, 400, 12, 46, hc); }
+
+  // face features
+  const eyeY = 400;
+  for (const s of [-1, 1]) {
+    ell(c, cx + s * 46, eyeY, 21, 10, "#f1ede4");
+    ell(c, cx + s * 46, eyeY, 8.5, 8.5, "#2a2018");
+    c.strokeStyle = shade(p.hairCol || "#d8d6d0", -0.25); c.lineWidth = p.female ? 4 : 8; c.lineCap = "round";
+    c.beginPath(); c.moveTo(cx + s * 24, eyeY - 28); c.quadraticCurveTo(cx + s * 50, eyeY - 40, cx + s * 74, eyeY - 26); c.stroke();
+  }
+  // nose
+  g = c.createLinearGradient(cx - 20, 0, cx + 30, 0);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(60,30,20,0.35)");
+  c.beginPath(); c.moveTo(cx - 6, 400); c.lineTo(cx + 22, 478); c.quadraticCurveTo(cx, 492, cx - 22, 480); c.closePath(); c.fillStyle = g; c.fill();
+  // mouth
+  c.strokeStyle = "rgba(90,40,35,.85)"; c.lineWidth = 4; c.beginPath(); c.moveTo(cx - 34, 532); c.quadraticCurveTo(cx, 544, cx + 34, 532); c.stroke();
+  if (p.stache) { c.beginPath(); c.moveTo(cx, 512); c.quadraticCurveTo(cx - 60, 500, cx - 84, 538); c.quadraticCurveTo(cx - 40, 524, cx, 528); c.quadraticCurveTo(cx + 40, 524, cx + 84, 538); c.quadraticCurveTo(cx + 60, 500, cx, 512); c.fillStyle = shade(p.hairCol, -0.1); c.fill(); }
+  if (p.beard) { c.save(); c.beginPath(); c.ellipse(cx, 410, 120, 158, 0, 0, Math.PI * 2); c.clip(); c.beginPath(); c.ellipse(cx, 560, 130, 100, 0, 0, Math.PI * 2); c.fillStyle = p.hairCol; c.fill(); c.restore(); ell(c, cx, 524, 40, 11, "rgba(0,0,0,0)"); c.strokeStyle = "rgba(230,200,180,.8)"; c.lineWidth = 4; c.beginPath(); c.moveTo(cx - 28, 530); c.quadraticCurveTo(cx, 542, cx + 28, 530); c.stroke(); }
+  if (p.glasses) { c.strokeStyle = "#15161b"; c.lineWidth = 6; for (const s of [-1, 1]) { c.beginPath(); c.ellipse(cx + s * 52, eyeY, 40, 31, 0, 0, Math.PI * 2); c.stroke(); } c.beginPath(); c.moveTo(cx - 12, eyeY - 4); c.lineTo(cx + 12, eyeY - 4); c.stroke(); }
+
+  // key light falloff + grain
+  g = c.createLinearGradient(0, 0, W, 0);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.55, "rgba(0,0,0,0.08)"); g.addColorStop(1, "rgba(0,0,0,0.5)");
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  for (let i = 0; i < 5000; i++) { c.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`; c.fillRect(Math.random() * W, Math.random() * H, 2, 2); }
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = v => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+
+/* ---------- shaders ---------- */
+const VERT = `attribute vec2 aPos; varying vec2 vUv;
+void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos,0.,1.); }`;
+
+const PRELUDE = `precision highp float;
+uniform sampler2D uTex; uniform vec2 uRes; uniform float uTime, uP;
+varying vec2 vUv;
+const vec3 BLUE = vec3(0.10,0.18,0.80);
+const vec3 IVORY = vec3(0.95,0.92,0.84);
+const vec3 RED = vec3(0.93,0.16,0.22);
+float lum(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }
+vec3 T(vec2 uv){ return clamp(pow(texture2D(uTex, uv).rgb, vec3(0.62))*1.12, 0., 1.); }  // shared levels lift
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y*0.75))); }
+float bayer4(vec2 a){ return bayer2(0.5*a)*0.25 + bayer2(a); }
+mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
+`;
+
+const SHADERS = [
+{ id: "jacquard", name: "Jacquard Loom", from: "Punch-card weaving, 1804", p: "hole density", d: 0.5, src: `
+void main(){
+  float cell = 6.0 + uP*14.0;
+  vec2 px = vUv*uRes, c = floor(px/cell);
+  float l = smoothstep(0.25,0.95,lum(T((c+0.5)*cell/uRes)));
+  vec2 f = fract(px/cell) - 0.5;
+  float size = pow(1.0-l, 0.8)*0.92;
+  float hole = step(max(abs(f.x),abs(f.y)), size*0.5);
+  vec3 card = vec3(0.89,0.77,0.52) * (0.92 + 0.08*hash(floor(px*0.5)));
+  card *= 0.9 + 0.1*sin(px.x*0.6);               // warp threads
+  vec3 col = mix(card, vec3(0.07,0.05,0.04), hole);
+  float edge = step(max(abs(f.x),abs(f.y)), size*0.5+0.06) - hole;   // bevel
+  col *= 1.0 - 0.35*edge*step(0.0, -f.x-f.y);
+  gl_FragColor = vec4(col,1.);
+}` },
+{ id: "baudot", name: "Baudot Tape", from: "5-bit paper tape, 1870", p: "bit size", d: 0.45, src: `
+void main(){
+  float cell = 4.0 + uP*9.0;
+  float h = cell*6.0;
+  vec2 px = vUv*uRes;
+  float b = floor(px.y/h);
+  float ry = px.y - b*h;
+  float r = floor(ry/cell);
+  float col = floor(px.x/cell);
+  float l = smoothstep(0.2,0.95,lum(T(vec2((col+0.5)*cell, (b+0.5)*h)/uRes)));
+  float q = floor(clamp(l,0.,1.)*31.99);
+  float k = r < 2.5 ? r : r-1.0;                 // row 2 is the sprocket
+  float bit = mod(floor(q/exp2(k)), 2.0);
+  vec2 f = fract(px/cell)-0.5;
+  float d = length(f);
+  bool sprocket = (r > 1.5 && r < 2.5);
+  float hole = sprocket ? step(d,0.2) : step(d,0.37)*bit;
+  vec3 paper = vec3(0.93,0.89,0.76) * (0.93+0.07*hash(floor(px)));
+  float edge = smoothstep(0.0,3.0,ry)*smoothstep(0.0,3.0,h-ry);
+  vec3 c3 = mix(paper*0.55, paper, edge);
+  c3 = mix(c3, vec3(0.04,0.04,0.07), hole);
+  gl_FragColor = vec4(c3,1.);
+}` },
+{ id: "bayer", name: "Bayer 1-bit", from: "Ordered dither, tricolore duotone", p: "pixel size", d: 0.4, src: `
+void main(){
+  float s = 1.0 + floor(uP*6.0);
+  vec2 p = floor(vUv*uRes/s);
+  float l = lum(T((p+0.5)*s/uRes));
+  l = clamp((l-0.08)*1.25, 0., 1.);
+  float on = step(bayer4(p)+0.03, l);
+  gl_FragColor = vec4(mix(BLUE*0.55, IVORY, on), 1.);
+}` },
+{ id: "ascii", name: "ASCII Terminal", from: "Text-mode art, BBS era", p: "glyph size", d: 0.4, src: `
+float seg(vec2 f, vec2 a, vec2 b, float w){
+  vec2 pa=f-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.);
+  return step(length(pa-ba*h), w);
+}
+void main(){
+  vec2 cell = vec2(8.,14.)*(0.8+uP*1.6);
+  vec2 px = vUv*uRes, c = floor(px/cell);
+  vec3 s = T((c+0.5)*cell/uRes);
+  float l = smoothstep(0.15,0.95,lum(s));
+  float idx = floor(clamp(l*1.15,0.,0.999)*8.0);
+  vec2 f = fract(px/cell);
+  f.x = (f.x-0.5)*(cell.y/cell.x)*0.55 + 0.5;
+  float m = 0.0;
+  if (idx>0.5) m = step(length(f-vec2(0.5,0.78)),0.09);                       // .
+  if (idx>1.5) m = max(m, step(length(f-vec2(0.5,0.35)),0.09));              // :
+  if (idx>2.5) m = max(m, seg(f,vec2(0.3,0.5),vec2(0.7,0.5),0.05));          // -
+  if (idx>3.5) m = max(m, seg(f,vec2(0.5,0.3),vec2(0.5,0.7),0.05));          // +
+  if (idx>4.5) m = max(m, max(seg(f,vec2(0.3,0.3),vec2(0.7,0.7),0.05), seg(f,vec2(0.3,0.7),vec2(0.7,0.3),0.05)));
+  if (idx>5.5) m = max(m, max(seg(f,vec2(0.35,0.2),vec2(0.35,0.8),0.05), seg(f,vec2(0.65,0.2),vec2(0.65,0.8),0.05)));
+  if (idx>6.5) m = step(max(abs(f.x-0.5)*1.3,abs(f.y-0.5)),0.36);
+  vec3 ink = mix(vec3(0.7,0.95,0.8), s*1.6, 0.4);
+  gl_FragColor = vec4(vec3(0.02,0.03,0.05) + ink*m, 1.);
+}` },
+{ id: "ruttetra", name: "Rutt-Etra Scanlines", from: "Analog video synth, 1973", p: "line density", d: 0.45, src: `
+void main(){
+  float py = vUv.y*uRes.y;
+  float sp = mix(14.,5.,uP), amp = sp*3.6;
+  float acc = 0.0, tint = 0.0;
+  for (int j=0;j<10;j++){
+    float L = floor((py-amp)/sp) + float(j);
+    float y0 = L*sp;
+    float l = smoothstep(0.2,0.95,lum(T(vec2(vUv.x, clamp(y0/uRes.y,0.,1.)))));
+    float d = abs(y0 + l*amp - py);
+    float v = exp(-d*d*1.1)*(0.3+1.0*l);
+    acc = max(acc, v); tint = max(tint, v*l);
+  }
+  vec3 col = mix(vec3(0.15,0.45,1.0), vec3(1.0,0.93,0.8), tint)*acc;
+  gl_FragColor = vec4(vec3(0.01,0.02,0.05)+col, 1.);
+}` },
+{ id: "minitel", name: "Minitel", from: "Teletel semigraphics + CRT, 1982", p: "block size", d: 0.3, src: `
+void main(){
+  vec2 q = vUv-0.5;
+  q *= 1.0 + dot(q,q)*0.22;
+  vec2 uv = q*0.96 + 0.5;
+  if (uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.){ gl_FragColor = vec4(0.,0.,0.,1.); return; }
+  vec2 cell = vec2(8.,12.)*(1.0+uP*2.2);
+  vec2 sub = cell/vec2(2.,3.);
+  vec2 px = uv*uRes, sp = floor(px/sub);
+  vec3 s = T((sp+0.5)*sub/uRes);
+  float l = lum(s);
+  float on = step(0.5 + (bayer4(sp)-0.5)*0.3, l*1.1);
+  vec3 qc = step(0.42, s);
+  if (dot(qc,vec3(1.))<1.0) qc = vec3(1.);
+  vec2 g = fract(px/sub);
+  float gap = smoothstep(0.0,0.14,g.x)*smoothstep(0.0,0.14,g.y);
+  vec3 col = qc*on*gap;
+  col += vec3(0.0,0.015,0.05);
+  col *= 0.8 + 0.2*sin(vUv.y*uRes.y*3.14159);
+  col *= 0.97 + 0.03*sin(uTime*55.);
+  col *= 1.0 - 1.8*dot(q,q);
+  gl_FragColor = vec4(col*1.15,1.);
+}` },
+{ id: "halftone", name: "Newsprint Halftone", from: "Offset printing, two-ink screen", p: "dot pitch", d: 0.45, src: `
+float screen(vec2 px, float ang, float s, float cov, float lsrc){
+  mat2 R = rot(ang);
+  vec2 p = R*px/s;
+  vec2 f = fract(p)-0.5;
+  float r = length(f);
+  float rad = sqrt(clamp(cov,0.,1.))*0.72;
+  return 1.0 - smoothstep(rad-0.5/s-0.02, rad+0.5/s+0.02, r);
+}
+float cellLum(vec2 px, float ang, float s){
+  mat2 R = rot(ang);
+  vec2 c = (floor(R*px/s)+0.5)*s;
+  return lum(T(clamp((c*R) / uRes, 0., 1.)));
+}
+void main(){
+  vec2 px = vUv*uRes;
+  float s = 5.0 + uP*11.0;
+  float l1 = cellLum(px, 0.785, s);
+  float l2 = cellLum(px, 0.26, s);
+  float blue = screen(px, 0.785, s, 1.0-l1, l1);
+  float red  = screen(px, 0.26, s, max(0.,(1.0-l2)-0.45)*1.8, l2);
+  vec3 col = IVORY;
+  col = mix(col, BLUE*0.8, blue*0.95);
+  col = mix(col, RED, red*0.85) * mix(1., 0.82, red*blue);
+  gl_FragColor = vec4(col,1.);
+}` },
+{ id: "engraving", name: "Gravure Hatching", from: "Copperplate engraving, Encyclopédie", p: "line pitch", d: 0.4, src: `
+void main(){
+  vec2 px = vUv*uRes, o = 1.5/uRes;
+  float l = (lum(T(vUv))*2. + lum(T(vUv+vec2(o.x,0.))) + lum(T(vUv-vec2(o.x,0.))) + lum(T(vUv+vec2(0.,o.y))) + lum(T(vUv-vec2(0.,o.y))))/6.0;
+  float gx = lum(T(vUv+vec2(o.x,0.))) - lum(T(vUv-vec2(o.x,0.)));
+  float gy = lum(T(vUv+vec2(0.,o.y))) - lum(T(vUv-vec2(0.,o.y)));
+  float edge = smoothstep(0.05,0.18,length(vec2(gx,gy)));
+  float per = 3.0 + uP*5.0;
+  float ink = 0.0;
+  float th;
+  th = clamp((0.85-l)*3.0,0.,1.)*0.7;  ink = max(ink, step(fract(dot(px,vec2(0.7071,0.7071))/per), th));
+  th = clamp((0.60-l)*3.0,0.,1.)*0.7;  ink = max(ink, step(fract(dot(px,vec2(0.7071,-0.7071))/per), th));
+  th = clamp((0.40-l)*3.0,0.,1.)*0.7;  ink = max(ink, step(fract(px.y/per), th));
+  th = clamp((0.22-l)*4.0,0.,1.)*0.7;  ink = max(ink, step(fract(px.x/per), th));
+  ink = max(ink, edge*0.8);
+  vec3 paper = vec3(0.93,0.88,0.76)*(0.95+0.05*hash(floor(px*0.5)));
+  gl_FragColor = vec4(mix(paper, vec3(0.06,0.07,0.16), ink), 1.);
+}` },
+{ id: "kuwahara", name: "Kuwahara Oil Paint", from: "Painterly filter, anisotropic-lite", p: "brush size", d: 0.5, src: `
+void quad(vec2 d, float stp, out vec3 m, out float v){
+  vec3 s = vec3(0.), s2 = vec3(0.);
+  for (int i=0;i<5;i++){ for (int j=0;j<5;j++){
+    vec3 c = T(vUv + vec2(float(i),float(j))*d*stp/uRes);
+    s += c; s2 += c*c;
+  }}
+  m = s/25.; vec3 vv = abs(s2/25. - m*m); v = vv.r+vv.g+vv.b;
+}
+void main(){
+  float stp = 1.0 + uP*2.5;
+  vec3 m0,m1,m2,m3; float v0,v1,v2,v3;
+  quad(vec2( 1., 1.), stp, m0, v0);
+  quad(vec2(-1., 1.), stp, m1, v1);
+  quad(vec2( 1.,-1.), stp, m2, v2);
+  quad(vec2(-1.,-1.), stp, m3, v3);
+  vec3 m = m0; float v = v0;
+  if (v1<v){ v=v1; m=m1; }
+  if (v2<v){ v=v2; m=m2; }
+  if (v3<v){ v=v3; m=m3; }
+  float g = lum(m);
+  m = mix(vec3(g), m, 1.35);
+  m = (m-0.5)*1.15+0.52;
+  m *= 0.96 + 0.08*hash(floor(vUv*uRes/2.0));
+  gl_FragColor = vec4(m,1.);
+}` },
+{ id: "glitch", name: "Datamosh Glitch", from: "Cracktro / corrupted MPEG", p: "corruption", d: 0.55, src: `
+void main(){
+  vec2 uv = vUv;
+  float t = floor(uTime*10.0);
+  float band = floor(uv.y*mix(8.,40.,hash(vec2(t,1.))));
+  float r = hash(vec2(band,t));
+  float on = step(1.0-uP*0.35, r);
+  uv.x += on*(hash(vec2(band,t+7.))-0.5)*0.3*uP;
+  vec2 grid = vec2(12.,16.);
+  vec2 bk = floor(uv*grid);
+  if (hash(bk+t) > 1.0-0.07*uP) uv = (bk+0.5)/grid;
+  float ca = (0.004 + 0.02*on)*uP + 0.002;
+  vec3 col = vec3(T(uv+vec2(ca,0.)).r, T(uv).g, T(uv-vec2(ca,0.)).b);
+  float trk = smoothstep(0.02,0.0,abs(fract(vUv.y*0.5 - uTime*0.13)-0.5)-0.47);
+  col += trk*0.15*uP;
+  col *= 0.88 + 0.12*sin(vUv.y*uRes.y*1.5);
+  col += (hash(vUv*uRes+uTime)-0.5)*0.08;
+  gl_FragColor = vec4(col,1.);
+}` },
+{ id: "thermal", name: "Tricolore Thermal", from: "Contour map / reactor core read-out", p: "contour count", d: 0.4, src: `
+void main(){
+  vec2 o = 2.0/uRes;
+  float l = (lum(T(vUv))*2. + lum(T(vUv+vec2(o.x,0.))) + lum(T(vUv-vec2(o.x,0.))) + lum(T(vUv+vec2(0.,o.y))) + lum(T(vUv-vec2(0.,o.y))))/6.0;
+  l = clamp((l-0.05)*1.2, 0., 1.);
+  vec3 c0 = vec3(0.02,0.02,0.12), c1 = BLUE, c2 = IVORY, c3 = RED, c4 = vec3(1.0,0.85,0.4);
+  vec3 col = mix(c0,c1,smoothstep(0.0,0.3,l));
+  col = mix(col,c2,smoothstep(0.3,0.55,l));
+  col = mix(col,c3,smoothstep(0.55,0.8,l));
+  col = mix(col,c4,smoothstep(0.8,1.0,l));
+  float g = fract(l*(5.0+uP*20.0) + uTime*0.02);
+  float line = 1.0 - smoothstep(0.0,0.08,min(g,1.0-g));
+  col *= 1.0 - 0.55*line;
+  gl_FragColor = vec4(col,1.);
+}` },
+{ id: "plasma", name: "Plasma + Copper", from: "Amiga / PC demoscene classics", p: "plasma mix", d: 0.5, src: `
+vec3 pal(float t){ return 0.5 + 0.5*cos(6.28318*(t + vec3(0.00,0.33,0.67)*vec3(1.0,0.8,0.6) + vec3(0.62,0.72,0.1))); }
+void main(){
+  vec2 p = vUv*vec2(uRes.x/uRes.y,1.)*4.0;
+  float pl = sin(p.x*1.7+uTime) + sin(p.y*2.1-uTime*1.3) + sin((p.x+p.y)*1.2+uTime*0.7) + sin(length(p-vec2(2.,2.))*3.0-uTime*2.0);
+  pl *= 0.25;
+  vec2 uv = vUv; uv.x += sin(uv.y*40.0+uTime*3.0)*0.003*(0.3+uP);
+  float l = lum(T(uv));
+  float bars = 0.5+0.5*sin(vUv.y*uRes.y*0.06 + uTime*2.0 + sin(vUv.x*3.0+uTime)*2.0);
+  float m = mix(l*1.5, pl, uP*0.7);
+  vec3 col = pal(m*0.8 + uTime*0.05);
+  col *= 0.12 + 1.05*smoothstep(0.02,0.85,l);
+  col += vec3(1.0,0.55,0.25)*pow(bars,10.0)*0.35*l;
+  gl_FragColor = vec4(col,1.);
+}` },
+{ id: "bloom", name: "Halation & Grade", from: "Film bloom, teal/orange, grain", p: "glow radius", d: 0.5, src: `
+void main(){
+  vec2 uv = vUv;
+  vec2 q = uv-0.5;
+  float ca = dot(q,q)*0.012*(0.5+uP);
+  vec3 base = vec3(T(uv+q*ca).r, T(uv).g, T(uv-q*ca).b);
+  vec3 acc = vec3(0.);
+  float R = 6.0 + uP*40.0;
+  for (int i=0;i<24;i++){
+    float fi = float(i);
+    float a = fi*2.39996;
+    float r = sqrt((fi+0.5)/24.0)*R;
+    vec3 c = T(uv + vec2(cos(a),sin(a))*r/uRes);
+    acc += max(c-0.42, 0.)*2.2;
+  }
+  acc /= 24.0;
+  vec3 col = base + acc*vec3(1.0,0.55,0.35)*1.6 + acc*0.5;
+  float l = lum(col);
+  col = mix(col*vec3(0.85,1.0,1.1), col*vec3(1.15,1.0,0.8), smoothstep(0.25,0.7,l));
+  col = smoothstep(0.0,1.0,col*1.08);
+  col *= 1.0 - dot(q,q)*1.3;
+  col += (hash(uv*uRes+uTime)-0.5)*0.07;
+  gl_FragColor = vec4(col,1.);
+}` },
+{ id: "voxel", name: "Bevel Blocks", from: "Voxel / tile mosaic with cast shadows", p: "block size", d: 0.4, src: `
+void main(){
+  float cell = 7.0 + uP*20.0;
+  vec2 px = vUv*uRes, c = floor(px/cell);
+  vec3 s = T((c+0.5)*cell/uRes);
+  float l = lum(s);
+  s = floor(s*5.0+0.5)/5.0;
+  vec2 f = fract(px/cell);
+  float w = 0.16;
+  float light = 1.0;
+  if (f.y > 1.0-w && f.y > f.x && f.y > 1.0-f.x) light = 1.35;         // top
+  else if (f.x < w && f.x < f.y)                  light = 1.18;         // left
+  else if (f.y < w)                               light = 0.62;         // bottom
+  else if (f.x > 1.0-w)                           light = 0.74;         // right
+  float lN = lum(T((c+vec2(-1.,1.)+0.5)*cell/uRes));
+  float shadow = clamp((lN-l)*2.2, 0., 0.5);
+  float inner = 1.0 - shadow*smoothstep(0.7,0.0,f.x*0.5+(1.0-f.y)*0.5);
+  vec3 col = s*light*inner*1.05;
+  gl_FragColor = vec4(col,1.);
+}` },
+];
+
+/* ---------- WebGL ---------- */
+const glc = document.createElement("canvas");
+const gl = glc.getContext("webgl", { preserveDrawingBuffer: true, antialias: false });
+if (!gl) document.getElementById("app").insertAdjacentHTML("afterbegin", "<p class=fail>WebGL is not available in this browser.</p>");
+
+function compile(type, src) {
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+function link(frag) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, frag));
+  gl.bindAttribLocation(p, 0, "aPos");
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return { p, u: { tex: gl.getUniformLocation(p, "uTex"), res: gl.getUniformLocation(p, "uRes"), time: gl.getUniformLocation(p, "uTime"), P: gl.getUniformLocation(p, "uP") } };
+}
+let tex;
+if (gl) {
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+}
+function uploadSource() {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, srcCanvas);
+}
+
+for (const s of SHADERS) {
+  s.full = PRELUDE + s.src;
+  s.value = s.d;
+  try { s.prog = link(s.full); } catch (e) { s.error = String(e.message || e); console.error(s.id, s.error); }
+}
+
+function renderTo(shader, target, w, h, time) {
+  if (shader.error) return;
+  if (glc.width !== w || glc.height !== h) { glc.width = w; glc.height = h; }
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(shader.prog.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(shader.prog.u.tex, 0);
+  gl.uniform2f(shader.prog.u.res, w, h);
+  gl.uniform1f(shader.prog.u.time, time);
+  gl.uniform1f(shader.prog.u.P, shader.value);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  const c = target.getContext("2d");
+  c.drawImage(glc, 0, 0);
+}
+
+/* ---------- UI ---------- */
+const TILE_W = 320, TILE_H = 400;
+const grid = document.getElementById("grid");
+const tiles = [];
+SHADERS.forEach((s, i) => {
+  const card = document.createElement("div"); card.className = "card";
+  const cv = document.createElement("canvas"); cv.width = TILE_W; cv.height = TILE_H;
+  const meta = document.createElement("div"); meta.className = "meta";
+  meta.innerHTML = `<h3></h3><p></p><label><span></span><input type="range" min="0" max="1" step="0.01"></label>`;
+  meta.querySelector("h3").textContent = `${String(i + 1).padStart(2, "0")} · ${s.name}`;
+  meta.querySelector("p").textContent = s.from;
+  meta.querySelector("span").textContent = s.p;
+  const rng = meta.querySelector("input"); rng.value = s.d;
+  rng.addEventListener("input", () => { s.value = +rng.value; });
+  card.append(cv, meta); grid.append(card);
+  if (s.error) { cv.replaceWith(Object.assign(document.createElement("div"), { className: "fail", textContent: "Shader failed: " + s.error })); }
+  else cv.addEventListener("click", () => openModal(i));
+  tiles.push({ s, cv, rng, visible: true });
+});
+const io = new IntersectionObserver(es => es.forEach(e => { const t = tiles.find(t => t.cv === e.target); if (t) t.visible = e.isIntersecting; }));
+tiles.forEach(t => io.observe(t.cv));
+
+const peopleEl = document.getElementById("people"), whoEl = document.getElementById("who");
+let current = 0, customImg = null;
+const day = Math.floor((Date.now() - Date.UTC(new Date().getUTCFullYear(), 0, 0)) / 864e5);
+PEOPLE.forEach((p, i) => {
+  const b = document.createElement("button"); b.className = "chip"; b.textContent = p.name.split(" ").slice(-1)[0];
+  b.addEventListener("click", () => selectPerson(i)); peopleEl.append(b);
+});
+function selectPerson(i) {
+  current = i; customImg = null;
+  [...peopleEl.children].forEach((b, j) => b.setAttribute("aria-pressed", j === i));
+  const p = PEOPLE[i];
+  whoEl.innerHTML = `<b>${p.name}</b> (${p.years}) — ${p.blurb} <span class="tag">· today's pick: day ${day % 180 + 1}/180</span>`;
+  drawPortrait(p); if (gl) uploadSource();
+}
+function useImage(img) {
+  const c = sctx, s = Math.max(SRC_W / img.width, SRC_H / img.height);
+  c.fillStyle = "#000"; c.fillRect(0, 0, SRC_W, SRC_H);
+  c.drawImage(img, (SRC_W - img.width * s) / 2, (SRC_H - img.height * s) / 2, img.width * s, img.height * s);
+  [...peopleEl.children].forEach(b => b.setAttribute("aria-pressed", false));
+  whoEl.innerHTML = "<b>Your portrait</b>";
+  uploadSource();
+}
+function loadFile(f) {
+  if (!f || !f.type.startsWith("image/")) return;
+  const img = new Image(); img.onload = () => { useImage(img); URL.revokeObjectURL(img.src); };
+  img.src = URL.createObjectURL(f);
+}
+const fileEl = document.getElementById("file");
+document.getElementById("upload").onclick = () => fileEl.click();
+fileEl.onchange = () => loadFile(fileEl.files[0]);
+addEventListener("dragover", e => { e.preventDefault(); document.body.id = "drop"; });
+addEventListener("dragleave", () => { document.body.id = ""; });
+addEventListener("drop", e => { e.preventDefault(); document.body.id = ""; loadFile(e.dataTransfer.files[0]); });
+
+let paused = false, clock = 0, last = performance.now();
+const pauseBtn = document.getElementById("pause");
+pauseBtn.onclick = () => { paused = !paused; pauseBtn.textContent = paused ? "Resume time" : "Pause time"; };
+
+/* modal */
+const modal = document.getElementById("modal"), mc = document.getElementById("mcanvas"), mp = document.getElementById("mp");
+let mi = -1;
+function openModal(i) {
+  mi = i; const s = SHADERS[i];
+  modal.hidden = false;
+  document.getElementById("mname").textContent = s.name;
+  document.getElementById("mdesc").textContent = s.from;
+  document.getElementById("mplabel").textContent = s.p;
+  document.getElementById("msrc").textContent = s.full;
+  mp.value = s.value;
+  const r = mc.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+  mc.width = Math.round(r.width * d); mc.height = Math.round(r.height * d);
+}
+const step = n => openModal((mi + n + SHADERS.length) % SHADERS.length);
+mp.oninput = () => { SHADERS[mi].value = +mp.value; tiles[mi].rng.value = mp.value; };
+document.getElementById("mclose").onclick = () => { modal.hidden = true; mi = -1; };
+document.getElementById("mprev").onclick = () => step(-1);
+document.getElementById("mnext").onclick = () => step(1);
+document.getElementById("mcopy").onclick = async e => {
+  try { await navigator.clipboard.writeText(SHADERS[mi].full); e.target.textContent = "Copied ✓"; }
+  catch { e.target.textContent = "Select the code below"; }
+  setTimeout(() => (e.target.textContent = "Copy GLSL"), 1500);
+};
+addEventListener("keydown", e => {
+  if (modal.hidden) return;
+  if (e.key === "Escape") document.getElementById("mclose").click();
+  if (e.key === "ArrowLeft") step(-1);
+  if (e.key === "ArrowRight") step(1);
+});
+modal.addEventListener("click", e => { if (e.target === modal) document.getElementById("mclose").click(); });
+
+function frame(now) {
+  if (!paused) clock += (now - last) / 1000;
+  last = now;
+  if (gl) {
+    if (mi >= 0) renderTo(SHADERS[mi], mc, mc.width, mc.height, clock);
+    else for (const t of tiles) if (t.visible) renderTo(t.s, t.cv, TILE_W, TILE_H, clock);
+  }
+  requestAnimationFrame(frame);
+}
+selectPerson(day % PEOPLE.length);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
