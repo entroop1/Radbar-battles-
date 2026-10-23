@@ -4,96 +4,195 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rising Lines</title>
+
 <style>
-  html,body{margin:0;height:100%;background:#0e0e10;overflow:hidden}
-  canvas{display:block;width:100%;height:100%}
+/* single-look composition: oxblood ground, scanline-red strokes, the cluster itself forms ZML: letters at left, long rule and scatter at right */
+:root{--bg:#14060a;--line:255,255,255;color-scheme:dark}
+html,body{height:100%;background:var(--bg);overflow:hidden}
+body{margin:0}
+canvas{display:block;width:100%;height:100%}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <script>
-const ROWS = 10;          // rows in the composition
-const COLS = 48;          // possible line positions per row
-const INTERVAL = 1400;    // ms between incoming rows
-const EASE = 0.07;
+const PITCH = 2;          // px between scanlines
+const GROUP = 3;          // scanlines that lift off together (one "row")
+const INTERVAL = 2200;    // ms between rows lifting off and being replaced
+const DRIFT = 140;        // px a lifted row keeps rising while it fades
+const LOWER = 0;          // scanlines of scattered lines under the letters
+const WORD = 'ZML';
 
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
-let W, H, dpr, margin, rowH, colW;
+let W, H, dpr, margin, T0, N, letterRuns, letterLines, ruleX0;
+let ents = [], tick = 0;
 
-function resize() {
+// Sample the word into horizontal runs, one list per scanline.
+function sampleWord() {
+  const fs = Math.max(40, Math.min(W * 0.09, 96));
+  const off = document.createElement('canvas');
+  const o = off.getContext('2d', { willReadFrequently: true });
+  const font = `900 ${fs}px "Arial Black", Impact, Helvetica, Arial, sans-serif`;
+  const setup = () => {
+    o.font = font;
+    if ('letterSpacing' in o) o.letterSpacing = (fs * 0.06) + 'px';
+  };
+  setup();
+  const tw = Math.ceil(o.measureText(WORD).width) + 4;
+  const th = Math.ceil(fs * 0.76);
+  off.width = tw; off.height = th;
+  setup();
+  o.fillStyle = '#fff';
+  o.fillText(WORD, 0, th);
+  const d = o.getImageData(0, 0, tw, th).data;
+  const rows = [];
+  for (let y = 0; y < th; y += PITCH) {
+    const runs = [];
+    let x = 0;
+    while (x < tw) {
+      while (x < tw && d[(y * tw + x) * 4 + 3] < 128) x++;
+      const a = x;
+      while (x < tw && d[(y * tw + x) * 4 + 3] >= 128) x++;
+      if (x > a) runs.push([a, x]);
+    }
+    rows.push(runs);
+  }
+  ruleX0 = Math.round(margin + tw + 14);
+  return rows;
+}
+
+function layout() {
   dpr = window.devicePixelRatio || 1;
   W = innerWidth; H = innerHeight;
   cv.width = W * dpr; cv.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  margin = Math.min(W, H) * 0.08;
-  rowH = (H - margin * 2) / ROWS;
-  colW = (W - margin * 2) / COLS;
+  margin = Math.round(Math.max(16, W * 0.07));
+  letterRuns = sampleWord();
+  letterLines = letterRuns.length;
+  N = letterLines + LOWER;
+  T0 = Math.max(16, H * 0.3);
 }
-addEventListener('resize', resize);
-resize();
 
-let lines = [];
-let rowCounter = 0;
+// Segments that make up one scanline: the letters, plus a long rule built from many short dashes.
+const RULES = [
+  // scanline offset from the bottom of the letters, share of the width, brightness at start/end, thickness
+  { up: 3, share: 1.00, b0: 0.95, b1: 0.35, w: 1.4 },
+  { up: 1, share: 0.55, b0: 0.55, b1: 0.15, w: 1 },
+];
 
-function makeRow(startY) {
-  const density = 0.35 + Math.random() * 0.4;
-  for (let c = 0; c < COLS; c++) {
-    if (Math.random() > density) continue;
-    lines.push({
-      c,
-      row: ROWS,                                  // slot below the last visible row
-      h: 0.25 + Math.random() * 0.65,             // fraction of row height
-      y: startY + Math.random() * rowH * 3,       // scattered start, floats up
-      delay: Math.random() * 400,
-      born: performance.now(),
-      w: Math.random() < 0.15 ? 2.5 : 1.2,
-    });
+function segmentsFor(s) {
+  const out = [];
+  const x1 = W - margin;
+  for (const [a, b] of letterRuns[s] || []) {
+    out.push({ x0: margin + a, x1: margin + b, b: 0.9 + Math.random() * 0.1 });
   }
+  for (const r of RULES) {
+    if (s !== letterLines - r.up) continue;
+    const end = Math.round(ruleX0 + (x1 - ruleX0) * r.share);
+    const dash = 9, gap = 0;     // dashes butt together: no horizontal gaps
+    for (let x = Math.round(ruleX0), i = 0; x < end; x += dash + gap, i++) {
+      const t = (x - ruleX0) / (end - ruleX0);
+      out.push({ x0: x, x1: Math.round(Math.min(end, x + dash)), b: r.b0 + (r.b1 - r.b0) * t, w: r.w, rule: true });
+    }
+  }
+  return out;
 }
 
-// Initial composition
-for (let r = 0; r < ROWS; r++) {
-  makeRow(H + 50);
-  lines.forEach(l => { if (l.row === ROWS) l.row = r; });
+function spawnSeg(g, s, delay) {
+  const tY = T0 + s * PITCH;
+  ents.push({
+    ...g, w: g.w || 1, s, tY,
+    // chaotic start: shifted sideways, stretched or shrunk, tidied up as it rises
+    dx: (Math.random() - 0.5) * W * 0.7,
+    dl: (Math.random() - 0.5) * W * 0.3,
+    dr: (Math.random() - 0.5) * W * 0.3,
+    c: 1,
+    y: H + 10 + Math.random() * 40,       // very bottom of the screen
+    dur: 4200 + Math.random() * 2200,
+    born: performance.now() + delay + Math.random() * 250,
+    mode: 'in', alpha: 0, vy: 0,
+  });
 }
 
-function pushRow() {
-  lines.forEach(l => l.row -= 1);   // everything moves up one slot
-  makeRow(H + 50);                  // new row enters at the bottom slot
-  lines.forEach(l => { if (l.row === ROWS) l.row = ROWS - 1; });
+function spawn(s, delay) {
+  for (const g of segmentsFor(s)) spawnSeg(g, s, delay);
 }
-setInterval(pushRow, INTERVAL);
+
+let unfilled = [], lastLift = [];
+
+function build() {
+  // reload starts empty: the cluster gathers a few lines at a time
+  ents = [];
+  unfilled = [];
+  for (let s = 0; s < N; s++) for (const g of segmentsFor(s)) unfilled.push({ g, s });
+  for (let i = unfilled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [unfilled[i], unfilled[j]] = [unfilled[j], unfilled[i]];
+  }
+  lastLift = new Array(Math.ceil(N / GROUP)).fill(0);
+}
+
+function lift(g) {
+  const lo = g * GROUP, hi = Math.min(N, lo + GROUP);
+  for (const e of ents) if (e.s >= lo && e.s < hi && e.mode !== 'out') e.mode = 'out';
+  for (let s = lo; s < hi; s++) spawn(s, 120);
+  lastLift[g] = ++tick;
+}
+
+// gathering: a few segments arrive each second, in random order
+setInterval(() => {
+  const n = 3 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < n && unfilled.length; i++) {
+    const { g, s } = unfilled.pop();
+    spawnSeg(g, s, 0);
+  }
+}, 1000);
+
+setInterval(() => {
+  if (unfilled.length) return;
+  // settled: the longest-waiting rows lift off and are replaced, so nothing stays static
+  const order = lastLift.map((t, g) => g).sort((a, b) => lastLift[a] - lastLift[b]);
+  order.slice(0, 3).sort(() => Math.random() - 0.5).slice(0, 1).forEach(lift);
+  // the rule is many small dashes: a handful of them are swapped out every tick
+  const dashes = ents.filter(e => e.rule && e.mode === 'idle');
+  for (let i = 0; i < 6 && dashes.length; i++) {
+    const e = dashes.splice(Math.floor(Math.random() * dashes.length), 1)[0];
+    e.mode = 'out';
+    spawnSeg({ x0: e.x0, x1: e.x1, b: e.b, w: e.w, rule: true }, e.s, 100);
+  }
+}, INTERVAL);
 
 function frame(now) {
   ctx.clearRect(0, 0, W, H);
-  ctx.lineCap = 'round';
-  lines = lines.filter(l => l.row > -2);
-
-  for (const l of lines) {
-    if (now - l.born < l.delay) continue;
-    const target = margin + l.row * rowH;
-    l.y += (target - l.y) * EASE;
-
-    // fade out on the way off the top, fade in from the bottom
-    const top = margin, bottom = H - margin;
-    let a = 1;
-    if (l.y < top) a = Math.max(0, 1 - (top - l.y) / rowH);
-    if (l.y > bottom - rowH) a = Math.min(a, Math.max(0, (bottom - l.y) / rowH + 1));
-    if (a <= 0.01) continue;
-
-    const x = margin + (l.c + 0.5) * colW;
-    const len = rowH * l.h;
-    const yy = l.y + (rowH - len) / 2;
-    ctx.strokeStyle = `rgba(240,236,228,${a * 0.9})`;
-    ctx.lineWidth = l.w;
-    ctx.beginPath();
-    ctx.moveTo(x, yy);
-    ctx.lineTo(x, yy + len);
-    ctx.stroke();
+  ents = ents.filter(e => e.alpha > 0.01 || e.mode !== 'out');
+  for (const e of ents) {
+    if (now < e.born) continue;
+    if (e.mode === 'in') {
+      if (e.y0 === undefined) e.y0 = e.y;
+      const t = Math.min(1, (now - e.born) / e.dur);
+      const k = 1 - Math.pow(1 - t, 4);                 // ease-out quart
+      e.y = e.y0 + (e.tY - e.y0) * k;
+      e.alpha = Math.min(1, t * 4);
+      e.c = Math.pow(1 - k, 2);
+      if (t >= 1) { e.y = e.tY; e.mode = 'idle'; e.alpha = 1; e.c = 0; }
+    } else if (e.mode === 'out') {
+      e.vy = (e.vy || 0.2) * 1.02;                     // ease-in: accelerates away
+      e.y -= e.vy;
+      e.alpha = Math.max(0, 1 - (e.tY - e.y) / DRIFT);
+    }
+    if (e.alpha <= 0.01) continue;
+    ctx.fillStyle = `rgba(255,255,255,${e.alpha * (0.4 + 0.6 * e.b)})`;
+    const xa = e.x0 + (e.dx + e.dl) * e.c;
+    const xb = Math.max(xa + 2, e.x1 + (e.dx + e.dr) * e.c);
+    ctx.fillRect(xa, e.y, xb - xa, e.w);
   }
   requestAnimationFrame(frame);
 }
+
+addEventListener('resize', () => { layout(); build(); });
+layout();
+build();
 requestAnimationFrame(frame);
 </script>
 </body>
