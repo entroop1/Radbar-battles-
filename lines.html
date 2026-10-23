@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rising Lines</title>
+<style>
+  html,body{margin:0;height:100%;background:#0e0e10;overflow:hidden}
+  canvas{display:block;width:100%;height:100%}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const ROWS = 10;          // rows in the composition
+const COLS = 48;          // possible line positions per row
+const INTERVAL = 1400;    // ms between incoming rows
+const EASE = 0.07;
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W, H, dpr, margin, rowH, colW;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  margin = Math.min(W, H) * 0.08;
+  rowH = (H - margin * 2) / ROWS;
+  colW = (W - margin * 2) / COLS;
+}
+addEventListener('resize', resize);
+resize();
+
+let lines = [];
+let rowCounter = 0;
+
+function makeRow(startY) {
+  const density = 0.35 + Math.random() * 0.4;
+  for (let c = 0; c < COLS; c++) {
+    if (Math.random() > density) continue;
+    lines.push({
+      c,
+      row: ROWS,                                  // slot below the last visible row
+      h: 0.25 + Math.random() * 0.65,             // fraction of row height
+      y: startY + Math.random() * rowH * 3,       // scattered start, floats up
+      delay: Math.random() * 400,
+      born: performance.now(),
+      w: Math.random() < 0.15 ? 2.5 : 1.2,
+    });
+  }
+}
+
+// Initial composition
+for (let r = 0; r < ROWS; r++) {
+  makeRow(H + 50);
+  lines.forEach(l => { if (l.row === ROWS) l.row = r; });
+}
+
+function pushRow() {
+  lines.forEach(l => l.row -= 1);   // everything moves up one slot
+  makeRow(H + 50);                  // new row enters at the bottom slot
+  lines.forEach(l => { if (l.row === ROWS) l.row = ROWS - 1; });
+}
+setInterval(pushRow, INTERVAL);
+
+function frame(now) {
+  ctx.clearRect(0, 0, W, H);
+  ctx.lineCap = 'round';
+  lines = lines.filter(l => l.row > -2);
+
+  for (const l of lines) {
+    if (now - l.born < l.delay) continue;
+    const target = margin + l.row * rowH;
+    l.y += (target - l.y) * EASE;
+
+    // fade out on the way off the top, fade in from the bottom
+    const top = margin, bottom = H - margin;
+    let a = 1;
+    if (l.y < top) a = Math.max(0, 1 - (top - l.y) / rowH);
+    if (l.y > bottom - rowH) a = Math.min(a, Math.max(0, (bottom - l.y) / rowH + 1));
+    if (a <= 0.01) continue;
+
+    const x = margin + (l.c + 0.5) * colW;
+    const len = rowH * l.h;
+    const yy = l.y + (rowH - len) / 2;
+    ctx.strokeStyle = `rgba(240,236,228,${a * 0.9})`;
+    ctx.lineWidth = l.w;
+    ctx.beginPath();
+    ctx.moveTo(x, yy);
+    ctx.lineTo(x, yy + len);
+    ctx.stroke();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
